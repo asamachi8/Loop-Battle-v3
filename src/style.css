@@ -1,0 +1,232 @@
+/* =========================================================================
+ * style.css — Ver.0.1 は視認性優先の最小限の見た目にする（仕様書 §20）
+ * ========================================================================= */
+:root {
+  --bg: #14171c;
+  --panel: #1d222a;
+  --panel-2: #252b35;
+  --line: #3a4351;
+  --text: #e6eaf0;
+  --muted: #98a2b3;
+  --p1: #4a90e2;
+  --p2: #e2564a;
+  --loop1: #f0b429;
+  --loop2: #a78bfa;
+  --move: #46c093;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+  font-size: 14px;
+}
+
+.app-header { padding: 16px 24px 8px; }
+.app-header h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+.app-header .ver { font-size: 12px; color: var(--muted); margin-left: 8px; }
+.app-header .sub { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+.app {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 8px 24px 32px;
+  flex-wrap: wrap;
+}
+
+/* ---- 盤面 ------------------------------------------------------------- */
+.board-panel { flex: 0 0 auto; }
+
+.board {
+  width: 640px;
+  max-width: 94vw;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: block;
+}
+
+.turn {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border-left: 6px solid var(--muted);
+}
+.turn-p1 { border-left-color: var(--p1); }
+.turn-p2 { border-left-color: var(--p2); }
+.turn-win { border-left-color: var(--loop1); color: var(--loop1); }
+
+.hint { color: var(--muted); min-height: 20px; margin: 8px 2px; }
+.board-name { color: var(--loop1); font-size: 12px; margin: 8px 2px 0; }
+
+/* ---- オンライン対戦パネル --------------------------------------------- */
+.online-status {
+  font-size: 12px; margin: 0 0 8px; padding: 6px 8px; border-radius: 6px;
+  background: var(--panel-2); border-left: 4px solid var(--muted); color: var(--muted);
+}
+.online-ok    { border-left-color: var(--move); color: var(--move); }
+.online-wait  { border-left-color: var(--loop1); color: var(--loop1); }
+.online-warn  { border-left-color: #f0b429; color: #f0b429; }
+.online-error { border-left-color: #ff6b6b; color: #ff6b6b; }
+.role-note { font-size: 12px; margin: 0 0 8px; color: var(--text); font-weight: 700; }
+.role-note:empty { display: none; }
+.online-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.online-link { display: flex; gap: 6px; margin-top: 8px; }
+.online-link input {
+  flex: 1 1 auto; min-width: 0;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--text); padding: 6px 8px; font-size: 12px;
+}
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.debug-grid select {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--text); padding: 5px 8px; width: 100%;
+}
+
+.board-actions { display: flex; gap: 8px; }
+
+.btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover { background: #2f3745; }
+.btn-primary { background: #2f6fb5; border-color: #3b82c4; font-weight: 700; }
+.btn-warn { background: #7a5a1c; border-color: #a97c25; }
+.btn-ghost { background: transparent; }
+
+/* ---- 盤面の要素 ------------------------------------------------------- */
+.grid-line { stroke: #4b5568; stroke-width: 2; }
+.loop-arc { fill: none; stroke-width: 3; opacity: .85; }
+.loop-rank-1 { stroke: var(--loop1); }
+.loop-rank-2 { stroke: var(--loop2); }
+.loop-rank-3 { stroke: var(--move); }
+.node { fill: #6b7688; }
+/* 交点の座標の透かし。ボタンで表示・非表示を切り替える */
+.coord-label {
+  text-anchor: middle; font-size: 12px; fill: var(--text);
+  opacity: .22; pointer-events: none; user-select: none;
+}
+.hide-coords .coord-label { display: none; }
+/* ループ入口。駒が乗っても見えるよう駒より大きい輪にし、
+   破線の「選択中」「突撃可能」マーカーと区別するため実線・低不透明度にする */
+.node-entry { fill: none; stroke-width: 2; opacity: .3; }
+.hit { fill: transparent; cursor: pointer; }
+
+.mark-selected { fill: none; stroke: #ffffff; stroke-width: 2.5; stroke-dasharray: 5 4; }
+.mark-move { fill: var(--move); opacity: .55; }
+.mark-charge { fill: none; stroke: var(--loop1); stroke-width: 3; stroke-dasharray: 6 5; }
+
+.piece-body { stroke: #10131a; stroke-width: 2; }
+.piece-p1 .piece-body { fill: var(--p1); }
+.piece-p2 .piece-body { fill: var(--p2); }
+.piece-hp {
+  text-anchor: middle; font-size: 20px; font-weight: 700;
+  fill: #fff; pointer-events: none;
+}
+.piece-label {
+  text-anchor: middle; font-size: 12px; fill: var(--muted); pointer-events: none;
+}
+
+.path-hover, .path-flash { fill: none; stroke-linecap: round; }
+.path-hover { stroke: var(--loop1); stroke-width: 7; opacity: .35; }
+.path-flash { stroke: #fff3c4; stroke-width: 8; opacity: .75; }
+
+.route-badge circle { fill: var(--loop1); stroke: #10131a; stroke-width: 2; cursor: pointer; }
+.route-badge text { text-anchor: middle; font-size: 15px; font-weight: 700; fill: #10131a; }
+
+.fx-text {
+  text-anchor: middle; font-size: 26px; font-weight: 800;
+  paint-order: stroke; stroke: #10131a; stroke-width: 5;
+  animation: fx-rise 1.1s ease-out forwards;
+  pointer-events: none;
+}
+.fx-normal { fill: #ffd166; }
+.fx-loop   { fill: #ff5d5d; font-size: 32px; }
+.fx-push   { fill: #7ee0c0; font-size: 22px; }
+.fx-wall   { fill: #ff9f43; font-size: 24px; }
+.fx-ko     { fill: #ffffff; font-size: 30px; }
+
+@keyframes fx-rise {
+  0%   { opacity: 0; transform: translateY(6px); }
+  20%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-22px); }
+}
+
+/* ---- サイドパネル ----------------------------------------------------- */
+.side-panel { flex: 1 1 320px; min-width: 300px; max-width: 460px; display: grid; gap: 14px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.card-title {
+  font-size: 13px; margin: 0 0 8px; color: var(--muted);
+  letter-spacing: .06em; text-transform: uppercase; cursor: default;
+}
+summary.card-title { cursor: pointer; }
+.card-title.p1 { color: var(--p1); }
+.card-title.p2 { color: var(--p2); margin-top: 14px; }
+
+.knight-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.knight-row.dead { opacity: .35; text-decoration: line-through; }
+.knight-name { width: 44px; font-weight: 700; }
+.knight-hp { color: var(--muted); font-size: 12px; margin-left: auto; }
+.hp-bar { display: flex; gap: 3px; }
+.hp-pip {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: #39414f; display: inline-block;
+}
+.hp-pip.on { background: var(--move); }
+
+.log { height: 220px; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+.log-line { padding: 1px 0; color: var(--muted); }
+.log-move { color: var(--text); }
+.log-hit  { color: #ffd166; }
+.log-loop { color: #ff8a7a; font-weight: 700; }
+.log-push { color: #7ee0c0; }
+.log-ko   { color: #fff; font-weight: 700; }
+.log-win  { color: var(--loop1); font-weight: 700; }
+.log-warn { color: #f0b429; }
+
+.debug-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-items: center;
+}
+.debug-grid label { color: var(--muted); font-size: 12px; }
+.debug-grid input {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--text); padding: 5px 8px; width: 100%;
+}
+.debug-actions { display: flex; gap: 8px; margin-top: 10px; }
+.quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.quick-label { color: var(--muted); font-size: 12px; }
+.btn-small { padding: 4px 10px; font-size: 12px; }
+.check-cell { display: flex; align-items: center; gap: 6px; }
+.check-cell label { color: var(--text); font-size: 12px; }
+.note { color: var(--muted); font-size: 11px; margin: 8px 0 0; line-height: 1.6; }
+.note code { background: var(--panel-2); padding: 1px 4px; border-radius: 3px; }
+.error { color: #ff6b6b; font-size: 12px; margin: 6px 0 0; }
+
+.rules { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.8; color: var(--text); }
+.rules b { color: var(--loop1); }
+
+.legend {
+  display: inline-block; width: 14px; height: 3px; vertical-align: middle;
+  margin: 0 4px 0 6px;
+}
+.legend-1 { background: var(--loop1); }
+.legend-2 { background: var(--loop2); }

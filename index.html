@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop Battle — 3騎VS3騎 ループ戦術ボードゲーム Ver.0.3</title>
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Loop Battle <span class="ver">Ver.0.3 プロトタイプ</span></h1>
+  <p class="sub">6×6交点盤 / 3騎 VS 3騎 / 同一PCまたはオンラインで2人対戦</p>
+</header>
+
+<main class="app">
+
+  <section class="board-panel">
+    <div id="turn" class="turn turn-p1">Player 1 のターン</div>
+    <svg id="board" class="board" xmlns="http://www.w3.org/2000/svg"></svg>
+    <p id="board-name" class="board-name"></p>
+    <p id="hint" class="hint">自軍の騎をクリックして選択してください。</p>
+    <div class="board-actions">
+      <button id="restart" class="btn btn-primary">RESTART</button>
+      <button id="toggle-coords" class="btn">座標を隠す</button>
+      <button id="pass" class="btn btn-warn" style="display:none">行動不能：パスする</button>
+    </div>
+  </section>
+
+  <aside class="side-panel">
+
+    <div class="card" id="online-card">
+      <h2 class="card-title">オンライン対戦</h2>
+      <p id="online-status" class="online-status">ローカル対戦中（同じPCで2人交互に操作）</p>
+      <p id="role-note" class="role-note"></p>
+      <div class="online-actions">
+        <button id="online-host" class="btn">対戦部屋を作る</button>
+        <button id="online-leave" class="btn btn-ghost" style="display:none">切断してローカルに戻す</button>
+      </div>
+      <div id="online-link-row" class="online-link" style="display:none">
+        <input id="online-link" type="text" readonly>
+        <button id="online-copy" class="btn btn-small">コピー</button>
+      </div>
+      <p class="note">
+        「対戦部屋を作る」を押すと対戦用のURLが出ます。それを相手に送り、相手がURLを開くと対戦が始まります。<br>
+        部屋を作った側が Player 1（青・先手）、参加した側が Player 2（赤）です。<br>
+        対局データは2台のブラウザ間で直接やり取りされます（接続の仲介にのみ外部サービスを使用）。
+      </p>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title p1">Player 1（青 / 下側）</h2>
+      <div id="roster-p1" class="roster"></div>
+      <h2 class="card-title p2">Player 2（赤 / 上側）</h2>
+      <div id="roster-p2" class="roster"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">ログ</h2>
+      <div id="log" class="log"></div>
+    </div>
+
+    <details class="card" open>
+      <summary class="card-title">デバッグ設定（数値調整）</summary>
+      <div class="quick-row">
+        <span class="quick-label">HP比較：</span>
+        <button id="quick-hp5" class="btn btn-small">HP 5 で開始</button>
+        <button id="quick-hp6" class="btn btn-small">HP 6 で開始</button>
+      </div>
+      <div class="debug-grid">
+        <label>最大HP</label>            <input id="cfg-max-hp" type="number" min="1" step="1">
+        <label>通常攻撃ダメージ</label>   <input id="cfg-normal-damage" type="number" min="0" step="1">
+        <label>ループ突撃ダメージ</label> <input id="cfg-loop-damage" type="number" min="0" step="1">
+        <label>ノックバック距離</label>   <input id="cfg-knockback" type="number" min="0" step="1">
+        <label>壁激突ダメージ</label>     <input id="cfg-wall-damage" type="number" min="0" step="1">
+        <label>盤面の種類</label>          <select id="cfg-board-type"></select>
+        <label>ループ入口までの歩数</label>   <input id="cfg-loop-entry" type="number" min="1" step="1">
+        <label>P1 初期配置</label>        <input id="cfg-place-p1" type="text" placeholder="4,1 4,2 4,3 / 26 27 28">
+        <label>P2 初期配置</label>        <input id="cfg-place-p2" type="text" placeholder="1,2 1,3 1,4 / 9 10 11">
+        <label>連鎖押し出し</label>
+        <span class="check-cell"><input id="cfg-chain" type="checkbox"><label for="cfg-chain">有効</label></span>
+      </div>
+      <p class="note">
+        初期配置は「行,列」（例 <code>4,1</code>）または盤面の通し番号（例 <code>26</code>）を空白区切りで指定。<br>
+        「ループ入口までの歩数」は 1 でループ入口に立っている必要あり、99 で Ver.0.1 の挙動になります。
+      </p>
+      <p id="debug-error" class="error"></p>
+      <div class="debug-actions">
+        <button id="debug-apply" class="btn">適用してリスタート</button>
+        <button id="debug-reset" class="btn btn-ghost">初期値に戻す</button>
+      </div>
+      <p class="note">恒久的に変更する場合は <code>src/config.js</code> を編集してください。</p>
+    </details>
+
+    <details class="card">
+      <summary class="card-title">ルール早見表</summary>
+      <ul class="rules">
+        <li>自分のターンに自軍の騎を1騎選び、1回だけ行動する。</li>
+        <li><b>通常移動</b>：縦横に隣接する空き交点へ1マス。駒の飛び越し不可。</li>
+        <li><b>通常接近攻撃</b>：移動によって<b>新しく隣接した</b>敵に -1。</li>
+        <li><b>ループ突撃</b>：<b>ループ入口（薄い丸）に立っている</b>ときだけ実行できる。
+            そこからループ弧へ入り、途中に駒が無ければ最初にぶつかった敵まで一気に突撃して -3。</li>
+        <li><b>ノックバック</b>：突撃してきた向きへ敵を1マス押し出す。
+            後ろに駒があれば<b>その駒ごと押し出す</b>（連鎖）。</li>
+        <li><b>壁激突</b>：盤端で押し出せない場合は追加で -1。</li>
+        <li>HP0で撃破。相手を全滅させたら勝利。</li>
+      </ul>
+      <p class="note">
+        <span class="legend legend-1"></span>外周寄りの弧 ／ <span class="legend legend-2"></span>内側の弧。
+        弧をどの隅に何本置くかは「盤面の種類」で切り替わる（現在の種類は盤面の下に表示）。
+        最外周の線（行0・行5・列0・列5）には弧が付かない。
+        薄い丸がループ入口で、そこに立つと盤外方向へ突撃できる。<br>
+        盤面の数字は左上から順に振った交点の通し番号（1〜36）。
+      </p>
+    </details>
+
+  </aside>
+</main>
+
+<script src="src/config.js"></script>
+<script src="src/board.js"></script>
+<script src="src/rules.js"></script>
+<script src="src/game.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/net.js"></script>
+<script src="src/online.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
