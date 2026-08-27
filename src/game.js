@@ -13,6 +13,8 @@ window.LB = window.LB || {};
   var PLAYER_LABEL = { p1: 'Player 1', p2: 'Player 2' };
 
   function Game(config) {
+    this.history = []; // 直近の対局の記録（リプレイ用）
+    this.frames = [];  // 進行中の対局の1手ごとのスナップショット
     this.applyConfig(config);
   }
 
@@ -24,19 +26,31 @@ window.LB = window.LB || {};
     this.reset();
   };
 
+  /**
+   * 初期配置の1件を盤面座標に変換する。
+   * 盤面の通し番号（26）と「行,列」形式（[4, 1]）の両方を受け付ける。
+   */
+  function toRowCol(pos, size) {
+    if (Array.isArray(pos)) return { r: pos[0], c: pos[1] };
+    var n = pos | 0;
+    return { r: Math.floor((n - 1) / size), c: (n - 1) % size };
+  }
+
   /** RESTART（仕様書 §24）：HP全回復・撃破騎復活・初期位置・P1ターンへ */
   Game.prototype.reset = function () {
+    this.archiveCurrentGame(); // 進行中だった対局を戦歴へ残す
     var cfg = this.config;
     var knights = [];
     ['p1', 'p2'].forEach(function (owner) {
       var placement = cfg.INITIAL_PLACEMENT[owner] || [];
       placement.forEach(function (pos, i) {
+        var rc = toRowCol(pos, cfg.BOARD_SIZE);
         knights.push({
           id: owner + '-' + (i + 1),
           label: (owner === 'p1' ? 'A' : 'B') + (i + 1),
           owner: owner,
-          r: pos[0],
-          c: pos[1],
+          r: rc.r,
+          c: rc.c,
           hp: cfg.MAX_HP,
           maxHp: cfg.MAX_HP,
           alive: true
@@ -51,7 +65,9 @@ window.LB = window.LB || {};
       winner: null
     };
     this.log = [];
+    this.frames = [];
     this.pushLog('Player 1 のターンです。');
+    this.recordFrame();
   };
 
   Game.prototype.pushLog = function (text, tone) {
@@ -94,6 +110,7 @@ window.LB = window.LB || {};
     var events = rules.resolveNormalMove(this.state, this.board, this.config, knight, dest);
     this.logEvents(events, 'normal');
     this.endTurn();
+    this.recordFrame();
     return events;
   };
 
@@ -101,12 +118,30 @@ window.LB = window.LB || {};
     var events = rules.resolveLoopCharge(this.state, this.board, this.config, knight, charge);
     this.logEvents(events, 'loop');
     this.endTurn();
+    this.recordFrame();
     return events;
+  };
+
+  /**
+   * 降参（投了）。手詰まりで続ける意味が無いときに使う。
+   * 相手の勝ちとして即座に決着させる。
+   * @param player 降参する側（省略時は現在の手番）
+   */
+  Game.prototype.resign = function (player) {
+    if (this.state.winner) return [];
+    var loser = player || this.state.currentPlayer;
+    var winner = loser === 'p1' ? 'p2' : 'p1';
+    this.state.winner = winner;
+    this.pushLog(PLAYER_LABEL[loser] + ' が降参しました。', 'warn');
+    this.pushLog(PLAYER_LABEL[winner] + ' の勝利！', 'win');
+    this.recordFrame();
+    return [{ type: 'resign', loser: loser, winner: winner }];
   };
 
   Game.prototype.pass = function () {
     this.pushLog(PLAYER_LABEL[this.state.currentPlayer] + ' は行動できる手が無いためパスしました。', 'warn');
     this.endTurn();
+    this.recordFrame();
     return [];
   };
 
@@ -138,6 +173,81 @@ window.LB = window.LB || {};
         self.pushLog('KO! ' + self.knightName(ev.knightId) + ' 撃破。', 'ko');
       }
     });
+  };
+
+  // ---- 対局の記録（リプレイ用）-----------------------------------------
+  // 1手ごとに盤面のスナップショットを残し、対局が終わる／やり直されるときに
+  // 「戦歴」として最大 HISTORY_LIMIT 件まで保存する。
+
+  var HISTORY_LIMIT = 3;
+
+  /** 現在の盤面を1コマとして記録する */
+  Game.prototype.recordFrame = function () {
+    var snap = JSON.stringify(this.state);
+    var last = this.frames[this.frames.length - 1];
+    if (last && last.snap === snap && last.logLen === this.log.length) return;
+    this.frames.push({ snap: snap, logLen: this.log.length });
+  };
+
+  /** 進行中の対局を戦歴へ移す（1手も指していない対局は残さない） */
+  Game.prototype.archiveCurrentGame = function () {
+    if (!this.frames || this.frames.length < 2) return;
+    var last = JSON.parse(this.frames[this.frames.length - 1].snap);
+    this.history.unshift({
+      frames: this.frames,
+      log: this.log.slice(),
+      winner: last.winner,
+      turns: last.turnCount,
+      board: this.boardType ? this.boardType.name : '',
+      at: new Date()
+    });
+    if (this.history.length > HISTORY_LIMIT) this.history.length = HISTORY_LIMIT;
+  };
+
+  /**
+   * 相手から届いた盤面を取り込む直前に呼ぶ。
+   * 相手がリスタートした場合はそこで対局の区切りとし、戦歴へ移す。
+   */
+  Game.prototype.noteIncomingState = function (incoming) {
+    var last = this.frames[this.frames.length - 1];
+    if (!last || !incoming) return;
+    var prev = JSON.parse(last.snap);
+    if (incoming.turnCount === 1 && (prev.turnCount > 1 || prev.winner)) {
+      this.archiveCurrentGame();
+      this.frames = [];
+    }
+  };
+
+  /**
+   * リプレイで選べる対局の一覧。
+   * @return [{key, label, frames, log}]
+   */
+  Game.prototype.replaySources = function () {
+    var out = [];
+    if (this.frames.length >= 2) {
+      out.push({
+        key: 'current',
+        label: '現在の対局（' + (this.frames.length - 1) + '手）',
+        frames: this.frames,
+        log: this.log
+      });
+    }
+    this.history.forEach(function (h, i) {
+      var result = h.winner === 'draw' ? '引き分け'
+                 : h.winner ? PLAYER_LABEL[h.winner] + ' 勝利'
+                 : '未決着';
+      out.push({
+        key: 'h' + i,
+        label: (i === 0 ? '直近' : (i + 1) + 'つ前') + 'の対局（' + result + '・' + h.turns + '手）',
+        frames: h.frames,
+        log: h.log
+      });
+    });
+    return out;
+  };
+
+  Game.prototype.findReplaySource = function (key) {
+    return this.replaySources().filter(function (s) { return s.key === key; })[0] || null;
   };
 
   // ---- ターン管理・勝敗判定 -------------------------------------------

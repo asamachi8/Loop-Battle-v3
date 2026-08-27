@@ -13,30 +13,34 @@
  *   1手あたり数KBだが、6駒のゲームなので問題にならない。
  *
  * 役割：
- *   部屋を作った側（host）が Player 1、参加した側（guest）が Player 2。
- *   設定（ルール・盤面の種類）は host のものを正とする。
+ *   部屋を作った側が host、参加した側が guest。
+ *   どちらが先攻（Player 1）になるかは host が決め、snapshot で相手に伝える。
+ *   設定（ルール・盤面の種類）も host のものを正とする。
  * ========================================================================= */
 window.LB = window.LB || {};
 (function (LB) {
   'use strict';
 
-  var PROTOCOL_VERSION = 1;
+  var PROTOCOL_VERSION = 2;
+
+  function other(player) { return player === 'p1' ? 'p2' : 'p1'; }
 
   /**
    * @param {Object} deps
-   *   game      : LB.Game
-   *   transport : { send(msg), close() } / Session が onMessage 等を差し込む
-   *   role      : 'host' | 'guest'
-   *   onChange  : 状態が変わったときに呼ばれる（再描画用）
-   *   onStatus  : 接続状態の通知 function(text, kind)
+   *   game       : LB.Game
+   *   transport  : { send(msg), close() } / Session が onMessage 等を差し込む
+   *   role       : 'host' | 'guest'
+   *   hostPlayer : host が担当する側（'p1' = 先攻 / 'p2' = 後攻）
+   *   onChange   : 状態が変わったときに呼ばれる（再描画用）
+   *   onStatus   : 接続状態の通知 function(text, kind)
    */
   function Session(deps) {
     this.game = deps.game;
     this.transport = deps.transport;
     this.role = deps.role;
+    this.hostPlayer = deps.hostPlayer || 'p1';
     this.onChange = deps.onChange || function () {};
     this.onStatus = deps.onStatus || function () {};
-    this.player = this.role === 'host' ? 'p1' : 'p2';
     this.connected = false;
 
     var self = this;
@@ -48,11 +52,18 @@ window.LB = window.LB || {};
 
   /** 自分が操作してよいプレイヤー */
   Session.prototype.localPlayer = function () {
-    return this.player;
+    return this.role === 'host' ? this.hostPlayer : other(this.hostPlayer);
   };
 
   Session.prototype.isMyTurn = function () {
-    return this.game.state.currentPlayer === this.player;
+    return this.game.state.currentPlayer === this.localPlayer();
+  };
+
+  /** host が先攻・後攻を変更する */
+  Session.prototype.setHostPlayer = function (player) {
+    this.hostPlayer = player === 'p2' ? 'p2' : 'p1';
+    this.pushConfig();
+    this.onChange({ sideChanged: true });
   };
 
   // ---- 送受信 -----------------------------------------------------------
@@ -61,6 +72,7 @@ window.LB = window.LB || {};
     return {
       t: 'sync',
       v: PROTOCOL_VERSION,
+      hostPlayer: this.hostPlayer,
       config: this.game.config,
       state: this.game.state,
       log: this.game.log
@@ -77,12 +89,14 @@ window.LB = window.LB || {};
 
   Session.prototype.handleOpen = function () {
     this.connected = true;
-    this.onStatus(this.role === 'host'
-      ? '相手が接続しました。あなたは Player 1（青）です。'
-      : '接続しました。あなたは Player 2（赤）です。', 'ok');
-    // host が現在の設定と盤面を送って初期同期する
+    this.onStatus('接続しました。' + this.playerLabel() + ' として対戦します。', 'ok');
+    // host が現在の設定・担当・盤面を送って初期同期する
     if (this.role === 'host') this.send(this.snapshot());
     this.onChange();
+  };
+
+  Session.prototype.playerLabel = function () {
+    return this.localPlayer() === 'p1' ? 'Player 1（青・先攻）' : 'Player 2（赤・後攻）';
   };
 
   Session.prototype.handleClose = function (reason) {
@@ -94,33 +108,48 @@ window.LB = window.LB || {};
   Session.prototype.handleMessage = function (msg) {
     if (!msg || typeof msg !== 'object') return;
     if (msg.v && msg.v !== PROTOCOL_VERSION) {
-      this.onStatus('相手のバージョンが違います。同じURLを開き直してください。', 'error');
+      this.onStatus('相手のバージョンが違います。両者ともページを開き直してください。', 'error');
       return;
     }
     if (msg.t === 'sync') {
-      var rebuilt = this.applySnapshot(msg);
-      this.onChange({ boardRebuilt: rebuilt });
-    } else if (msg.t === 'resign') {
+      var applied = this.applySnapshot(msg);
+      // 担当が入れ替わったら表示を訂正する（接続直後に host の指定が届く場合を含む）
+      if (applied.sideChanged && this.connected) {
+        this.onStatus('あなたは ' + this.playerLabel() + ' です。', 'ok');
+      }
+      this.onChange({ boardRebuilt: applied.boardRebuilt, sideChanged: applied.sideChanged });
+    } else if (msg.t === 'request-sync') {
+      // 相手から「盤面を最新にしてほしい」と言われたので送り返す
+      this.send(this.snapshot());
+      this.onStatus('相手の要求で盤面を送信しました。', 'info');
+    } else if (msg.t === 'leave') {
       this.onStatus('相手が退出しました。', 'warn');
       this.connected = false;
       this.onChange();
     }
   };
 
-  /** 受け取った盤面で自分の状態を置き換える。盤面を作り直したら true を返す。 */
+  /** 受け取った内容で自分の状態を置き換える */
   Session.prototype.applySnapshot = function (msg) {
     var game = this.game;
-    var rebuilt = false;
+    var result = { boardRebuilt: false, sideChanged: false };
+    if (msg.hostPlayer && msg.hostPlayer !== this.hostPlayer) {
+      this.hostPlayer = msg.hostPlayer;
+      result.sideChanged = true;
+    }
     if (msg.config) {
       // 設定が変わっていれば盤面を作り直す（盤面の種類やHPの変更に追従する）
       if (JSON.stringify(game.config) !== JSON.stringify(msg.config)) {
         game.applyConfig(msg.config);
-        rebuilt = true;
+        result.boardRebuilt = true;
       }
     }
+    // 相手がリスタートしていれば、ここで対局の区切りとして戦歴へ移す
+    if (msg.state) game.noteIncomingState(msg.state);
     if (msg.state) game.state = msg.state;
     if (msg.log) game.log = msg.log;
-    return rebuilt;
+    if (msg.state) game.recordFrame();
+    return result;
   };
 
   /** 自分が1手指したあとに呼ぶ */
@@ -129,14 +158,25 @@ window.LB = window.LB || {};
     this.send(this.snapshot());
   };
 
-  /** host が RESTART や設定変更をしたときに呼ぶ */
+  /** RESTART・設定変更・降参のあとに呼ぶ */
   Session.prototype.pushConfig = function () {
     if (!this.connected) return;
     this.send(this.snapshot());
   };
 
+  /**
+   * 盤面を最新に更新する。
+   * 相手に snapshot を要求すると同時に、自分の状態も送る。
+   * 通信が一瞬途切れて手が届かなかった場合の復旧用。
+   */
+  Session.prototype.requestSync = function () {
+    if (!this.connected) return false;
+    this.send({ t: 'request-sync', v: PROTOCOL_VERSION });
+    return true;
+  };
+
   Session.prototype.leave = function () {
-    if (this.connected) this.send({ t: 'resign', v: PROTOCOL_VERSION });
+    if (this.connected) this.send({ t: 'leave', v: PROTOCOL_VERSION });
     this.connected = false;
     try { this.transport.close(); } catch (e) { /* 切断済み */ }
   };
@@ -168,5 +208,6 @@ window.LB = window.LB || {};
 
   LB.Session = Session;
   LB.PROTOCOL_VERSION = PROTOCOL_VERSION;
+  LB.otherPlayer = other;
 
 })(window.LB);

@@ -29,6 +29,10 @@ window.LB = window.LB || {};
     this.showCoords = true;   // 座標の透かしを表示するか
     this.localPlayer = null;  // オンライン対戦時に操作できる側（null = 同じPCで2人）
     this.onAction = null;     // 1手指したあとに呼ばれる（オンライン同期用）
+    this.pathArcKeys = {};    // 経路ハイライトで方向▲を描いた弧
+    this.replay = null;       // リプレイ再生中の状態
+    this.replayTimer = null;
+    this.onReplayUpdate = null; // 再描画のたびに呼ばれる（リプレイ操作パネル更新用）
     this.buildBoard();
   }
 
@@ -223,6 +227,7 @@ window.LB = window.LB || {};
 
   /** 今このブラウザで操作してよいか（オンライン対戦の手番制御）*/
   UI.prototype.canAct = function () {
+    if (this.replay) return false; // リプレイ中は操作させない
     if (!this.localPlayer) return true;
     return this.game.state.currentPlayer === this.localPlayer;
   };
@@ -272,8 +277,31 @@ window.LB = window.LB || {};
     }, 900);
   };
 
+  /**
+   * ループ弧の上に、進む向きを示す小さな▲を作る。
+   * @param arc     board.arcs の要素
+   * @param forward true なら a→b の向き
+   */
+  UI.prototype.arcArrow = function (arc, forward, cls) {
+    var m = this.game.board.arcMarker(arc, forward);
+    var g = svgEl('g', {
+      'class': cls,
+      transform: 'translate(' + m.x.toFixed(1) + ',' + m.y.toFixed(1) + ') rotate(' + m.angle.toFixed(1) + ')'
+    });
+    g.appendChild(svgEl('polygon', { points: '-5,-6 7,0 -5,6' }));
+    return g;
+  };
+
+  /** 経路の1ステップが弧を a→b の向きに通るかどうか */
+  UI.prototype.stepIsForward = function (step, arc) {
+    var board = this.game.board;
+    var exit = board.exitPort(step.from.r, step.from.c, step.dirIn);
+    return board.samePort(exit, arc.a);
+  };
+
   // ---- 経路の描画 -------------------------------------------------------
   UI.prototype.drawPath = function (steps, cls) {
+    var self = this;
     var board = this.game.board;
     var layer = this.layers.path;
     steps.forEach(function (st) {
@@ -298,8 +326,90 @@ window.LB = window.LB || {};
         layer.appendChild(svgEl('line', {
           x1: entryXY.x, y1: entryXY.y, x2: to.x, y2: to.y, 'class': cls
         }));
+        // どちら回りに通るかを▲で示す
+        var fwd = board.samePort(exit, arc.a);
+        self.pathArcKeys[st.arcId + (fwd ? 'F' : 'B')] = true;
+        layer.appendChild(self.arcArrow(arc, fwd, 'arc-dir arc-dir-path'));
       }
     });
+  };
+
+  // ---- リプレイ ---------------------------------------------------------
+  // 記録した対局のコマを順に表示する。リプレイ中は盤面を操作できない。
+
+  var REPLAY_INTERVAL = 700; // 1コマあたりの再生間隔(ms)
+
+  /** 表示に使う盤面（リプレイ中は記録されたコマ） */
+  UI.prototype.viewState = function () {
+    if (!this.replay) return this.game.state;
+    var f = this.replay.frames[this.replay.index];
+    if (!f) return this.game.state;
+    if (!f.parsed) f.parsed = JSON.parse(f.snap);
+    return f.parsed;
+  };
+
+  /** 表示に使うログ（リプレイ中はそのコマまで） */
+  UI.prototype.viewLog = function () {
+    if (!this.replay) return this.game.log;
+    var f = this.replay.frames[this.replay.index];
+    return this.replay.log.slice(0, f ? f.logLen : 0);
+  };
+
+  UI.prototype.isReplaying = function () { return !!this.replay; };
+
+  UI.prototype.startReplay = function (source) {
+    if (!source || !source.frames || source.frames.length === 0) return false;
+    this.pauseReplay();
+    this.selectedId = null;
+    this.sel = null;
+    this.routeChoice = null;
+    this.hoverPath = null;
+    this.flashPath = null;
+    this.replay = {
+      frames: source.frames, log: source.log,
+      label: source.label, key: source.key,
+      index: 0, playing: false
+    };
+    this.render();
+    return true;
+  };
+
+  UI.prototype.stopReplay = function () {
+    this.pauseReplay();
+    this.replay = null;
+    this.render();
+  };
+
+  UI.prototype.playReplay = function () {
+    if (!this.replay) return;
+    var self = this;
+    // 最後まで見終わっていたら頭から
+    if (this.replay.index >= this.replay.frames.length - 1) this.replay.index = 0;
+    this.replay.playing = true;
+    this.replayTimer = setInterval(function () {
+      if (!self.replay) return self.pauseReplay();
+      if (self.replay.index >= self.replay.frames.length - 1) {
+        self.pauseReplay();
+        self.render();
+        return;
+      }
+      self.replay.index++;
+      self.render();
+    }, REPLAY_INTERVAL);
+    this.render();
+  };
+
+  UI.prototype.pauseReplay = function () {
+    if (this.replayTimer) { clearInterval(this.replayTimer); this.replayTimer = null; }
+    if (this.replay) this.replay.playing = false;
+  };
+
+  UI.prototype.seekReplay = function (delta) {
+    if (!this.replay) return;
+    this.pauseReplay();
+    var i = this.replay.index + delta;
+    this.replay.index = Math.max(0, Math.min(this.replay.frames.length - 1, i));
+    this.render();
   };
 
   // ---- 全体描画 ---------------------------------------------------------
@@ -308,6 +418,7 @@ window.LB = window.LB || {};
     this.renderBoard();
     this.renderStatus();
     this.renderLog();
+    if (this.onReplayUpdate) this.onReplayUpdate();
   };
 
   UI.prototype.renderBoard = function () {
@@ -318,6 +429,8 @@ window.LB = window.LB || {};
     clear(this.layers.path);
     clear(this.layers.hint);
     clear(this.layers.pieces);
+    // 経路ハイライトで▲を描いた弧。選択ガイド側で二重に描かないよう控える
+    this.pathArcKeys = {};
 
     // 経路ハイライト
     if (this.flashPath) this.drawPath(this.flashPath, 'path-flash');
@@ -336,6 +449,21 @@ window.LB = window.LB || {};
           cx: p.x, cy: p.y, r: 11, 'class': 'mark-move'
         }));
       });
+      // ループ突撃で通る弧に、進む向きの▲を出す（同じ弧・同じ向きは1つだけ）
+      var arrowSeen = {};
+      this.sel.charges.forEach(function (ch) {
+        ch.steps.forEach(function (st) {
+          if (st.arcId === null) return;
+          var arc = board.arcs[st.arcId];
+          if (!arc) return;
+          var forward = self.stepIsForward(st, arc);
+          var key = st.arcId + (forward ? 'F' : 'B');
+          if (arrowSeen[key] || self.pathArcKeys[key]) return; // 経路側で描いた分は省く
+          arrowSeen[key] = true;
+          self.layers.hint.appendChild(
+            self.arcArrow(arc, forward, 'arc-dir loop-rank-' + arc.rank));
+        });
+      });
       // ループ突撃可能な敵
       Object.keys(this.sel.byTarget).forEach(function (tid) {
         var t = rules.getKnight(game.state, tid);
@@ -346,8 +474,8 @@ window.LB = window.LB || {};
       });
     }
 
-    // 駒
-    game.state.knights.forEach(function (k) {
+    // 駒（リプレイ中は記録されたコマの盤面）
+    this.viewState().knights.forEach(function (k) {
       if (!k.alive) return;
       var p = board.pointXY(k.r, k.c);
       var g = svgEl('g', { 'class': 'piece piece-' + k.owner });
@@ -377,20 +505,28 @@ window.LB = window.LB || {};
 
   UI.prototype.renderStatus = function () {
     var game = this.game;
-    var state = game.state;
+    var state = this.viewState();
     var dom = this.dom;
+    var replaying = this.isReplaying();
+
+    // リプレイ中は盤面に印を付ける
+    if (replaying) dom.board.classList.add('is-replay');
+    else dom.board.classList.remove('is-replay');
 
     // ターン表示 / 勝敗表示
-    dom.turn.className = 'turn turn-' + state.currentPlayer;
+    dom.turn.className = 'turn turn-' + state.currentPlayer + (replaying ? ' turn-replay' : '');
     if (state.winner) {
       dom.turn.className = 'turn turn-win';
       dom.turn.textContent = state.winner === 'draw'
         ? 'DRAW'
         : LB.PLAYER_LABEL[state.winner] + ' WIN!';
     } else {
-      dom.turn.textContent = LB.PLAYER_LABEL[state.currentPlayer] + ' のターン（Turn '
-        + state.turnCount + '）';
+      dom.turn.textContent = (replaying ? '▶ リプレイ ' : '')
+        + LB.PLAYER_LABEL[state.currentPlayer] + ' のターン（Turn ' + state.turnCount + '）';
     }
+
+    // 盤面左の手番表示
+    this.renderTurnSide();
 
     // 各騎のHP
     ['p1', 'p2'].forEach(function (owner) {
@@ -420,7 +556,11 @@ window.LB = window.LB || {};
     });
 
     // 選択中の騎の情報
-    if (state.winner) {
+    if (replaying) {
+      dom.hint.textContent = 'リプレイ再生中：' + this.replay.label
+        + '（' + (this.replay.index + 1) + ' / ' + this.replay.frames.length + ' コマ）'
+        + ' — 「停止」で対局に戻ります。';
+    } else if (state.winner) {
       dom.hint.textContent = 'RESTART で再戦できます。';
     } else if (!this.canAct()) {
       dom.hint.textContent = '相手の手番です。相手が指すまでお待ちください。';
@@ -434,14 +574,54 @@ window.LB = window.LB || {};
       dom.hint.textContent = '自軍の騎をクリックして選択してください。';
     }
 
+    // 降参ボタン（決着後・リプレイ中は押せない）
+    if (dom.resign) dom.resign.disabled = replaying || !!state.winner;
+
     // 手詰まり時のパス
-    dom.pass.style.display = (!state.winner && this.canAct() && !game.hasAnyAction()) ? 'block' : 'none';
+    dom.pass.style.display = (!replaying && !state.winner && this.canAct() && !game.hasAnyAction())
+      ? 'block' : 'none';
+  };
+
+  /**
+   * 盤面左の手番表示。
+   * 「今どちらの番か」を色と文字で示し、オンライン対戦では
+   * それが自分か相手かも出す。
+   */
+  UI.prototype.renderTurnSide = function () {
+    var dom = this.dom;
+    if (!dom.turnSide) return;
+    var state = this.viewState();
+    var cls = 'turn-side';
+
+    if (state.winner) {
+      dom.turnSideName.textContent = state.winner === 'draw'
+        ? 'DRAW' : LB.PLAYER_LABEL[state.winner];
+      dom.turnSideWho.textContent = state.winner === 'draw' ? '引き分け'
+        : (this.localPlayer
+            ? (state.winner === this.localPlayer ? 'あなたの勝ち' : 'あなたの負け')
+            : 'の勝利');
+      dom.turnSideLabel.textContent = '決着';
+      cls += ' turn-side-win';
+    } else {
+      dom.turnSideLabel.textContent = '手番';
+      dom.turnSideName.textContent = LB.PLAYER_LABEL[state.currentPlayer];
+      cls += ' turn-side-' + state.currentPlayer;
+      if (this.localPlayer) {
+        var mine = state.currentPlayer === this.localPlayer;
+        dom.turnSideWho.textContent = mine ? 'あなたの番' : '相手の番';
+        if (mine) cls += ' turn-side-mine';
+      } else {
+        dom.turnSideWho.textContent = state.currentPlayer === 'p1' ? '青・下側' : '赤・上側';
+      }
+    }
+    dom.turnSideCount.textContent = 'Turn ' + state.turnCount;
+    dom.turnSide.className = cls;
   };
 
   UI.prototype.renderLog = function () {
     var box = this.dom.log;
     box.innerHTML = '';
-    this.game.log.slice(-40).forEach(function (entry) {
+    this.viewLog().slice(-40).forEach(function (entry) {
       var div = document.createElement('div');
       div.className = 'log-line log-' + entry.tone;
       div.textContent = entry.text;

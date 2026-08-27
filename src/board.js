@@ -243,6 +243,29 @@ window.LB = window.LB || {};
              ' '   + a.p2.x + ' ' + a.p2.y;
     }
 
+    /**
+     * 弧の中央の座標と、そこを通るときの進行方向（度）を返す。
+     * 「ループをどちら回りに進むか」を示す▲の配置に使う。
+     * @param forward true なら a→b の向き、false なら b→a の向き
+     */
+    function arcMarker(arc, forward) {
+      var a = arcPoints(arc);
+      var t = 0.5, u = 1 - t;
+      var x = u * u * u * a.p1.x + 3 * u * u * t * a.c1.x + 3 * u * t * t * a.c2.x + t * t * t * a.p2.x;
+      var y = u * u * u * a.p1.y + 3 * u * u * t * a.c1.y + 3 * u * t * t * a.c2.y + t * t * t * a.p2.y;
+      // ベジェ曲線の接線から向きを求める
+      var dx = 3 * u * u * (a.c1.x - a.p1.x) + 6 * u * t * (a.c2.x - a.c1.x) + 3 * t * t * (a.p2.x - a.c2.x);
+      var dy = 3 * u * u * (a.c1.y - a.p1.y) + 6 * u * t * (a.c2.y - a.c1.y) + 3 * t * t * (a.p2.y - a.c2.y);
+      var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (!forward) angle += 180;
+      return { x: x, y: y, angle: angle };
+    }
+
+    /** 2つのポート（線の端）が同じかどうか */
+    function samePort(p, q) {
+      return !!p && !!q && p.type === q.type && p.line === q.line && p.side === q.side;
+    }
+
     /** 全ての弧を含む描画範囲を求める（ベジェ曲線をサンプリング） */
     function contentBounds() {
       var min = { x: 0, y: 0 }, max = { x: END, y: END };
@@ -300,6 +323,8 @@ window.LB = window.LB || {};
       pointXY: pointXY,
       portXY: portXY,
       arcPathD: arcPathD,
+      arcMarker: arcMarker,
+      samePort: samePort,
       gridLines: gridLines,
       arcPoints: arcPoints,
       viewBox: function () {

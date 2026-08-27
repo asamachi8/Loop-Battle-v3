@@ -230,3 +230,101 @@ summary.card-title { cursor: pointer; }
 }
 .legend-1 { background: var(--loop1); }
 .legend-2 { background: var(--loop2); }
+
+/* ---- 盤面左の手番表示 ------------------------------------------------- */
+.board-row { display: flex; align-items: stretch; gap: 12px; }
+
+.turn-side {
+  flex: 0 0 96px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  border-top: 5px solid var(--muted);
+  text-align: center;
+}
+.turn-side-label { font-size: 11px; color: var(--muted); letter-spacing: .16em; }
+.turn-side-dot {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--muted); border: 3px solid #10131a;
+}
+.turn-side-name { font-size: 13px; font-weight: 700; }
+.turn-side-who { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.turn-side-count { font-size: 11px; color: var(--muted); margin-top: auto; }
+
+.turn-side-p1 { border-top-color: var(--p1); }
+.turn-side-p1 .turn-side-dot { background: var(--p1); }
+.turn-side-p1 .turn-side-name { color: var(--p1); }
+.turn-side-p2 { border-top-color: var(--p2); }
+.turn-side-p2 .turn-side-dot { background: var(--p2); }
+.turn-side-p2 .turn-side-name { color: var(--p2); }
+.turn-side-win { border-top-color: var(--loop1); }
+.turn-side-win .turn-side-dot { background: var(--loop1); }
+.turn-side-win .turn-side-name { color: var(--loop1); }
+
+/* 自分の手番のときは目立たせる */
+.turn-side-mine { box-shadow: 0 0 0 2px var(--move) inset; }
+.turn-side-mine .turn-side-who { color: var(--move); font-weight: 700; }
+
+/* ---- 先攻後攻の選択・共有ボタン --------------------------------------- */
+.side-choice { margin: 4px 0 10px; }
+.side-choice-buttons { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.side-btn.is-active {
+  background: #2f6fb5; border-color: #3b82c4; color: #fff; font-weight: 700;
+}
+.online-share { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.online-share .btn { text-decoration: none; display: inline-block; }
+.btn-danger { background: #7a2f2f; border-color: #a94242; }
+.btn-danger:hover { background: #8f3838; }
+
+/* ---- ループ弧の進行方向マーク ----------------------------------------- */
+/* 選択中の騎がループ突撃で通る弧に、どちら回りに進むかを▲で示す */
+.arc-dir { pointer-events: none; }
+.arc-dir polygon { stroke: #10131a; stroke-width: 1.5; }
+.arc-dir.loop-rank-1 { fill: var(--loop1); stroke: none; opacity: .9; }
+.arc-dir.loop-rank-2 { fill: var(--loop2); stroke: none; opacity: .9; }
+.arc-dir.loop-rank-3 { fill: var(--move);  stroke: none; opacity: .9; }
+/* 経路ハイライト中はより明るく */
+.arc-dir-path { fill: #fff3c4; stroke: none; opacity: 1; }
+
+/* ---- リプレイ --------------------------------------------------------- */
+.replay-bar { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.replay-select {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--text); padding: 5px 8px; width: 100%; font-size: 12px;
+}
+.replay-buttons { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.replay-pos { color: var(--muted); font-size: 12px; margin-left: auto; }
+.turn-replay { border-left-color: var(--loop2); color: var(--loop2); }
+.board.is-replay { border-color: var(--loop2); box-shadow: 0 0 0 2px rgba(167, 139, 250, .35); }
+
+/* ---- ログ／リプレイ枠の左右切り替え ------------------------------------ */
+/* ログの枠は左右どちらのスロットにも入れられる。空のスロットは場所を取らない */
+.log-slot:empty { display: none; }
+
+.log-slot-left {
+  flex: 0 0 340px;
+  max-width: 94vw;
+  align-self: stretch;
+}
+
+/* カード見出しと切り替えボタンを横並びにする */
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.card-head .card-title { margin: 0; }
+
+/* 左に置いたときは盤面と同じ高さまで使えるので、ログを縦に長く見せる */
+.log-slot-left .log-card { position: sticky; top: 12px; }
+.log-slot-left .log { height: 460px; }
+
+/* 画面が狭くて横に並べきれないときは、盤面 → ログ → その他 の縦並びにする
+   （ログが盤面より上へ回り込んで盤面が押し下げられるのを防ぐ） */
+@media (max-width: 1200px) {
+  .log-slot-left { order: 1; flex: 1 1 320px; }
+  .side-panel { order: 2; }
+  .log-slot-left .log-card { position: static; }
+  .log-slot-left .log { height: 260px; }
+}
