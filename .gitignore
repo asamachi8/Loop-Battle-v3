@@ -1,0 +1,18 @@
+# OS が作るファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# ローカル作業用のメモなど
+*.local
+
+# 駒の元画像（1254px・1枚あたり約2.5MB、6枚で約16MB）
+# ゲームは assets/pieces/<コレクション>/ の Web用ファイルだけを読み込みます。
+# 元画像を公開リポジトリに含めたくない場合は、次の行のコメントを外してください。
+# 手元には残るので、あとから Web用ファイルを作り直せます。
+# assets/pieces/*/original/
