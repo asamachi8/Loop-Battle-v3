@@ -18,7 +18,7 @@ window.LB = window.LB || {};
   LB.BOARD_TYPES = [
     {
       id: 1,
-      name: '全隅ダブルループ',
+      name: 'クローバー盤',
       summary: '弧8本 / 四隅に2本ずつ。一周する回路が2つできる',
       arcs: [
         [7, 2], [12, 5], [25, 32], [30, 35],   // 黄（内側）：行1・行4 / 列1・列4 の回路
@@ -27,7 +27,7 @@ window.LB = window.LB || {};
     },
     {
       id: 2,
-      name: '対角2ループ',
+      name: 'ツインループ盤',
       summary: '弧2本 / 右上・左下に1本ずつ。経路は一周せず行き止まりで終わる',
       arcs: [
         [4, 24],   // 右上：列3の上端 ←→ 行3の右端
@@ -36,7 +36,7 @@ window.LB = window.LB || {};
     },
     {
       id: 3,
-      name: '右上・左下ダブルループ',
+      name: 'バタフライ盤',
       summary: '弧4本 / 右上・左下に2本ずつ。4本とも一周せず行き止まりで終わる',
       arcs: [
         [12, 5], [25, 32],   // 黄（内側）：行1→列4 / 行4→列1。どちらも行き止まりで終わる
@@ -45,6 +45,38 @@ window.LB = window.LB || {};
     }
   ];
 
+  // 駒の絵柄（キャラクター）の一覧。assets/pieces/ の Web用ファイルを指す。
+  // 元画像（1254px の PNG）は同じフォルダに日本語ファイル名のまま置いてある。
+  LB.PIECE_CHARACTERS = [
+    { key: 'amerigo',    name: 'アメリゴ船長',         src: 'assets/pieces/amerigo.png' },
+    { key: 'aosuke',     name: 'シンガーアオスケ',      src: 'assets/pieces/aosuke.png' },
+    { key: 'marguerite', name: 'マルグリットメイド長',   src: 'assets/pieces/marguerite.png' },
+    { key: 'jane-doe',   name: 'ジェーンドゥ',         src: 'assets/pieces/jane-doe.png' },
+    { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: 'assets/pieces/tsuzumi.png' },
+    { key: 'asamachi',   name: 'ガイドあさまち',        src: 'assets/pieces/asamachi.png' }
+  ];
+
+  // 既定の割り当て（騎のID → キャラクターのキー）。
+  // 実際の割り当ては LB.pieceArt が持ち、駒HP枠のドロップダウンで入れ替えられる。
+  LB.DEFAULT_PIECE_ART = {
+    'p1-1': 'amerigo',  'p1-2': 'aosuke',  'p1-3': 'marguerite',
+    'p2-1': 'jane-doe', 'p2-2': 'tsuzumi', 'p2-3': 'asamachi'
+  };
+
+  LB.pieceArt = {};
+  Object.keys(LB.DEFAULT_PIECE_ART).forEach(function (id) {
+    LB.pieceArt[id] = LB.DEFAULT_PIECE_ART[id];
+  });
+
+  /** キャラクターのキーから定義を引く */
+  LB.getCharacter = function (key) {
+    return LB.PIECE_CHARACTERS.filter(function (c) { return c.key === key; })[0] || null;
+  };
+
+  /** 騎のIDから、いま割り当てられている絵柄を引く */
+  LB.characterFor = function (knightId) {
+    return LB.getCharacter(LB.pieceArt[knightId]);
+  };
   LB.getBoardType = function (id) {
     var found = LB.BOARD_TYPES.filter(function (t) { return t.id === id; })[0];
     return found || LB.BOARD_TYPES[0];
@@ -55,7 +87,7 @@ window.LB = window.LB || {};
     BOARD_SIZE: 6,
 
     // 盤面の種類（LB.BOARD_TYPES の id）
-    //   1 = 全隅ダブルループ（弧8本） / 2 = 対角2ループ（弧2本） / 3 = 右上・左下ダブルループ（弧4本）
+    //   1 = クローバー盤（弧8本） / 2 = ツインループ盤（弧2本） / 3 = バタフライ盤（弧4本）
     BOARD_TYPE: 1,
 
     // 騎の最大HP

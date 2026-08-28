@@ -297,44 +297,91 @@
     }
   }
 
-  // ---- ログ枠の左右切り替え ---------------------------------------------
-  // 盤面の左右どちらにログを置くかを選べるようにする。
-  // 選んだ位置はブラウザに覚えさせ、次に開いたときも同じ配置にする。
+  // ---- サイドパネルの左右切り替えと開閉 ---------------------------------
+  // ルール早見表・ログ／リプレイ・駒のHP・デバッグ設定などの枠は1つのパネルに
+  // まとめてあり、盤面の左右どちらへでもまとめて移動できる。
+  // 位置と各枠の開閉状態はブラウザに覚えさせ、次に開いたときも同じ見た目にする。
 
-  var LOG_SIDE_KEY = 'loopbattle.logSide';
+  var PANEL_SIDE_KEY = 'loopbattle.panelSide';
+  var PANEL_OPEN_KEY = 'loopbattle.panelOpen';
 
-  function readLogSide() {
+  function loadPref(key, fallback) {
     try {
-      var v = window.localStorage.getItem(LOG_SIDE_KEY);
-      return v === 'left' ? 'left' : 'right';
+      var v = window.localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
     } catch (e) {
-      return 'right'; // localStorage が使えない環境では既定値
+      return fallback; // localStorage が使えない環境では既定値で動く
     }
   }
 
-  function saveLogSide(side) {
-    try { window.localStorage.setItem(LOG_SIDE_KEY, side); } catch (e) { /* 保存できなくても動作に影響しない */ }
+  function savePref(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 保存できなくても動作に影響しない */ }
   }
 
-  /** ログ枠を指定の側へ移す */
-  function applyLogSide(side) {
-    var slot = side === 'left' ? dom.logSlotLeft : dom.logSlotRight;
-    if (dom.logCard.parentNode !== slot) slot.appendChild(dom.logCard);
-    dom.logSideToggle.textContent = side === 'left' ? '右へ ▶' : '◀ 左へ';
-    dom.logSideToggle.title = side === 'left'
-      ? 'ログを盤面の右側（サイドパネル）へ戻します'
-      : 'ログを盤面の左側へ移します';
-    // ログは末尾を見たいので、移動後も最新行までスクロールしておく
-    dom.log.scrollTop = dom.log.scrollHeight;
+  /** パネルを指定の側へ移す */
+  function applyPanelSide(side) {
+    var slot = side === 'left' ? dom.panelSlotLeft : dom.panelSlotRight;
+    if (dom.sidePanel.parentNode !== slot) slot.appendChild(dom.sidePanel);
+    dom.panelSideToggle.textContent = side === 'left' ? '右へ ▶' : '◀ 左へ';
+    dom.panelSideToggle.title = side === 'left'
+      ? '4つの枠をまとめて盤面の右側へ戻します'
+      : '4つの枠をまとめて盤面の左側へ移します';
+    dom.log.scrollTop = dom.log.scrollHeight; // 移動後もログの最新行を見せる
   }
 
-  function initLogSide() {
-    var side = readLogSide();
-    applyLogSide(side);
-    dom.logSideToggle.addEventListener('click', function () {
+  function initPanelSide() {
+    var side = loadPref(PANEL_SIDE_KEY, 'right') === 'left' ? 'left' : 'right';
+    applyPanelSide(side);
+    dom.panelSideToggle.addEventListener('click', function () {
       side = (side === 'left') ? 'right' : 'left';
-      applyLogSide(side);
-      saveLogSide(side);
+      applyPanelSide(side);
+      savePref(PANEL_SIDE_KEY, side);
+    });
+  }
+
+  // ---- 駒の絵柄の割り当て -----------------------------------------------
+  // 駒HP枠のドロップダウンで、どの騎にどの絵柄を使うかを選べる。
+  // 6種類のどれを何騎に使ってもよい（相手と同じ絵柄でも構わない）。
+  // 相手側の3騎も同じように選べる。
+  // 見た目だけの設定なのでブラウザに保存し、対戦相手へは送らない。
+
+  var PIECE_ART_KEY = 'loopbattle.pieceArt';
+
+  /** 保存された割り当てが「6騎ぶん・実在するキー」かを確かめる（重複は許す） */
+  function validPieceArt(map) {
+    if (!map || typeof map !== 'object') return false;
+    var ids = Object.keys(LB.DEFAULT_PIECE_ART);
+    for (var i = 0; i < ids.length; i++) {
+      if (!LB.getCharacter(map[ids[i]])) return false;
+    }
+    return true;
+  }
+
+  function initPieceArt() {
+    var saved = loadPref(PIECE_ART_KEY, null);
+    if (validPieceArt(saved)) {
+      Object.keys(LB.DEFAULT_PIECE_ART).forEach(function (id) { LB.pieceArt[id] = saved[id]; });
+      ui.render();   // 初回描画はこの前に走っているので、読み込んだ割り当てを反映し直す
+    }
+    ui.onPieceArtChange = function (knightId, key) {
+      if (!LB.getCharacter(key) || LB.pieceArt[knightId] === key) return;
+      LB.pieceArt[knightId] = key;   // 重複は許す（同じ絵柄を何騎でも使える）
+      savePref(PIECE_ART_KEY, LB.pieceArt);
+      ui.render();
+    };
+  }
+
+  /** 各枠の開閉状態を覚えておく */
+  function initPanelToggles() {
+    var saved = loadPref(PANEL_OPEN_KEY, {}) || {};
+    var cards = dom.sidePanel.querySelectorAll('details.card');
+    Array.prototype.forEach.call(cards, function (card) {
+      if (!card.id) return;
+      if (Object.prototype.hasOwnProperty.call(saved, card.id)) card.open = !!saved[card.id];
+      card.addEventListener('toggle', function () {
+        saved[card.id] = card.open;
+        savePref(PANEL_OPEN_KEY, saved);
+      });
     });
   }
 
@@ -423,6 +470,7 @@
     dom = {
       board: $('board'),
       turn: $('turn'),
+      turnText: $('turn-text'),
       hint: $('hint'),
       log: $('log'),
       pass: $('pass'),
@@ -466,9 +514,10 @@
       replayNext: $('replay-next'),
       replayPos: $('replay-pos'),
       logCard: $('log-card'),
-      logSlotLeft: $('log-slot-left'),
-      logSlotRight: $('log-slot-right'),
-      logSideToggle: $('log-side-toggle')
+      sidePanel: $('side-panel'),
+      panelSlotLeft: $('panel-slot-left'),
+      panelSlotRight: $('panel-slot-right'),
+      panelSideToggle: $('panel-side-toggle')
     };
 
     game = new LB.Game(LB.config);
@@ -483,7 +532,9 @@
     dom.debugFields = [dom.maxHp, dom.normalDamage, dom.loopDamage, dom.knockback,
       dom.wallDamage, dom.boardType, dom.loopEntry, dom.chain, dom.placeP1, dom.placeP2];
 
-    initLogSide();
+    initPanelSide();
+    initPieceArt();
+    initPanelToggles();
     initReplay();
     initOnline();
 

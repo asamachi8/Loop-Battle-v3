@@ -1,163 +1,358 @@
 /* =========================================================================
- * style.css — Ver.0.1 は視認性優先の最小限の見た目にする（仕様書 §20）
+ * style.css — Ver.0.4 バロック調の見た目
+ *
+ * 参考画像（assets/reference/）の雰囲気に合わせる：
+ *   蝋燭に照らされた薄暗い展示室の壁に、金の額縁に入った絵画が掛かっていて、
+ *   その絵の上で対局しているように見せる。
+ *   ・空間は焦茶〜黒。光源は左上寄りの暖かい灯り（明暗の対比＝キアロスクーロ）
+ *   ・額縁は CSS で作る（金箔のムラ・面取りの光・珠つなぎ・角飾りの彫刻）
+ *   ・盤面は古い油彩のキャンバス（布目・ニスの照り・四隅の暗がり）
+ *   ・文字は明朝／セリフ体、装飾は金
+ * 機能面（配置・開閉・リプレイなど）の指定は Ver.0.3 から引き継いでいる。
  * ========================================================================= */
 :root {
-  --bg: #14171c;
-  --panel: #1d222a;
-  --panel-2: #252b35;
-  --line: #3a4351;
-  --text: #e6eaf0;
-  --muted: #98a2b3;
-  --p1: #4a90e2;
-  --p2: #e2564a;
-  --loop1: #f0b429;
-  --loop2: #a78bfa;
-  --move: #46c093;
+  /* 展示室 */
+  --wall-dark:  #100b07;   /* 部屋の隅の闇 */
+  --wall:       #1c1410;   /* 壁の基調 */
+  --candle:     #ffcf94;   /* 蝋燭の灯り */
+
+  /* 板・パネル */
+  --panel:      #1d150f;   /* 木の面 */
+  --panel-2:    #2a1f16;   /* 入力欄など一段明るい面 */
+  --line:       #5b4527;   /* 縁取り（古びた金） */
+
+  /* 金 */
+  --gold:       #c8a44a;
+  --gold-lit:   #f3dfa2;
+  --gold-deep:  #6d5119;
+
+  /* 文字 */
+  --text:       #ece0cc;   /* 生成り */
+  --muted:      #a8927a;
+
+  /* 盤上の要素 */
+  --p1:    #4a72a8;        /* ラピスラズリの青 */
+  --p2:    #b04338;        /* 朱の赤 */
+  --loop1: #d8b45c;        /* 外周寄りの弧＝金 */
+  --loop2: #bab3a0;        /* 内側の弧＝古い銀 */
+  --move:  #74a08a;        /* 移動可能＝緑青 */
+
+  --font-serif: "Cormorant Garamond", "Times New Roman", "Hiragino Mincho ProN",
+                "Yu Mincho", "游明朝", "MS PMincho", serif;
+  --font-ui: "Yu Gothic UI", "Segoe UI", Meiryo, sans-serif;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
+  /* 壁：左上からの蝋燭の灯りと、四隅へ落ちる闇 */
+  background:
+    radial-gradient(1100px 760px at 26% 6%, rgba(255, 197, 122, .16), transparent 62%),
+    radial-gradient(900px 700px at 78% 32%, rgba(255, 170, 90, .06), transparent 65%),
+    radial-gradient(140% 120% at 50% 40%, transparent 42%, rgba(0, 0, 0, .72) 100%),
+    /* 漆喰のムラ */
+    repeating-linear-gradient(96deg, rgba(255, 255, 255, .012) 0 3px, rgba(0, 0, 0, .02) 3px 7px),
+    linear-gradient(180deg, #241a13 0%, var(--wall) 46%, var(--wall-dark) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
-.app-header { padding: 16px 24px 8px; }
-.app-header h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
-.app-header .ver { font-size: 12px; color: var(--muted); margin-left: 8px; }
-.app-header .sub { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+/* ---- 見出し（美術館の題札）------------------------------------------- */
+.app-header {
+  padding: 22px 24px 12px;
+  text-align: center;
+}
+.app-header h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  color: var(--gold-lit);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .8), 0 0 26px rgba(255, 190, 110, .28);
+}
+.app-header .ver {
+  font-size: 12px; letter-spacing: .12em; color: var(--muted);
+  margin-left: 10px; vertical-align: middle;
+}
+.app-header .sub {
+  margin: 8px auto 0;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  letter-spacing: .1em;
+  max-width: 620px;
+  padding-top: 8px;
+  /* 題札の罫 */
+  border-top: 1px solid rgba(200, 164, 74, .28);
+}
 
 .app {
   display: flex;
-  gap: 20px;
+  gap: 22px;
   align-items: flex-start;
-  padding: 8px 24px 32px;
+  padding: 8px 24px 40px;
   flex-wrap: wrap;
 }
 
-/* ---- 盤面 ------------------------------------------------------------- */
-.board-panel { flex: 0 0 auto; }
+/* ---- 額縁（絵画用の額縁写真を border-image で貼る）--------------------
+   assets/board/frame-gold.png は assets/reference/frame1.png から作った派生素材。
+   縦長だった原画の左右レールから2本の帯（計379px）を抜き、継ぎ目を40行かけて
+   なじませて開口部を正方形（631×630px）にしてある。
+   border-image は画像を9分割し、四隅は変形させずに上下左右の辺だけを伸縮させるため、
+   1枚の画像で盤面サイズの変化に追従できる。
 
-.board {
-  width: 640px;
-  max-width: 94vw;
-  height: auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  display: block;
+   素材の実寸： 全体 920×940 ／ 開口 631×630
+                帯の太さ 上174 右146 下136 左143（px）
+   --fw = 額縁の外寸（横）。枠の太さも盤面の大きさもここから比例計算する。
+   --fb = 枠の太さの倍率。1 = 原画どおり。下げるほど枠が細く盤面が広くなる。   */
+
+.board-panel { flex: 0 0 auto; }
+.board-row { display: flex; justify-content: flex-start; }
+
+.artframe {
+  --fw: min(880px, 94vw);
+  --fb: 1;
+  position: relative;
+  width: var(--fw);
+  max-width: 100%;
+  /* 影は矩形ではなく額の輪郭に沿わせる */
+  filter: drop-shadow(0 26px 46px rgba(0, 0, 0, .8)) drop-shadow(0 5px 12px rgba(0, 0, 0, .6));
+  border-style: solid;
+  border-color: transparent;
+  border-left-width:   calc(var(--fw) * .15543 * var(--fb));  /* 143 / 920 */
+  border-right-width:  calc(var(--fw) * .15870 * var(--fb));  /* 146 / 920 */
+  border-top-width:    calc(var(--fw) * .18912 * var(--fb));  /* 174 / 920 x 開口比 */
+  border-bottom-width: calc(var(--fw) * .14783 * var(--fb));  /* 136 / 920 x 開口比 */
+  border-image-source: url("../assets/board/frame-gold.png");
+  border-image-slice: 174 146 136 143;
+  border-image-repeat: stretch;
 }
 
+/* 額の内側の落ち込み（画布が一段沈んで見えるように） */
+.artframe-inner {
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .55), inset 0 4px 18px rgba(0, 0, 0, .6);
+}
+
+/* 高精細な画面（Windowsの拡大表示125%以上・Retinaなど）には1.5倍の素材を配る。
+   等倍の画面では 783KB の frame-gold.png だけを読み、こちらは取りに行かない。 */
+@media (min-resolution: 1.25dppx) {
+  .artframe {
+    border-image-source: url("../assets/board/frame-gold-hi.png");
+    border-image-slice: 261 219 204 215;  /* 等倍の 174 146 136 143 を1.5倍したもの */
+  }
+}
+/* ---- 盤面＝古い油彩のキャンバス --------------------------------------- */
+.board {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* 布目 → ニスの照り → 四隅の暗がり → 下地 */
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 245, 225, .022) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255, 245, 225, .022) 0 1px, transparent 1px 3px),
+    linear-gradient(128deg, rgba(255, 214, 150, .10) 0%, transparent 42%),
+    radial-gradient(120% 105% at 38% 26%, rgba(150, 112, 62, .30) 0%, transparent 60%),
+    radial-gradient(140% 125% at 50% 50%, transparent 52%, rgba(0, 0, 0, .40) 100%),
+    linear-gradient(170deg, #3c2e1f 0%, #322618 50%, #281d12 100%);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, .34);
+}
+
+/* ---- 題札（ターン表示）----------------------------------------------- */
 .turn {
-  font-size: 16px;
-  font-weight: 700;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  border-left: 6px solid var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  letter-spacing: .08em;
+  padding: 9px 16px;
+  margin-bottom: 10px;
+  background: linear-gradient(180deg, #2a1f16, #1d150f);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--muted);
+  border-radius: 2px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(243, 223, 162, .12);
 }
 .turn-p1 { border-left-color: var(--p1); }
 .turn-p2 { border-left-color: var(--p2); }
-.turn-win { border-left-color: var(--loop1); color: var(--loop1); }
+.turn-win { border-left-color: var(--gold); color: var(--gold-lit); }
+.turn-replay { border-left-color: var(--loop2); color: var(--loop2); }
 
-.hint { color: var(--muted); min-height: 20px; margin: 8px 2px; }
-.board-name { color: var(--loop1); font-size: 12px; margin: 8px 2px 0; }
-
-/* ---- オンライン対戦パネル --------------------------------------------- */
-.online-status {
-  font-size: 12px; margin: 0 0 8px; padding: 6px 8px; border-radius: 6px;
-  background: var(--panel-2); border-left: 4px solid var(--muted); color: var(--muted);
+.hint {
+  color: var(--muted); min-height: 20px; margin: 10px 2px;
+  font-family: var(--font-serif); font-size: 13.5px; letter-spacing: .04em;
 }
-.online-ok    { border-left-color: var(--move); color: var(--move); }
-.online-wait  { border-left-color: var(--loop1); color: var(--loop1); }
-.online-warn  { border-left-color: #f0b429; color: #f0b429; }
-.online-error { border-left-color: #ff6b6b; color: #ff6b6b; }
-.role-note { font-size: 12px; margin: 0 0 8px; color: var(--text); font-weight: 700; }
-.role-note:empty { display: none; }
-.online-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.online-link { display: flex; gap: 6px; margin-top: 8px; }
-.online-link input {
+.board-name {
+  color: var(--gold); font-size: 12px; margin: 10px 2px 0;
+  font-family: var(--font-serif); letter-spacing: .05em;
+}
+
+/* ---- 手番表示の中身（色駒アイコンとプレイヤー名）------------------------
+   もとは盤面の左に縦の銘板として置いていたが、Ver.0.4 で手番の帯へまとめた。 */
+.turn-text { color: var(--gold-lit); font-size: 15px; letter-spacing: .1em; }
+.turn-side {
+  display: flex; align-items: center; gap: 10px;
   flex: 1 1 auto; min-width: 0;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
-  color: var(--text); padding: 6px 8px; font-size: 12px;
 }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
-.debug-grid select {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
-  color: var(--text); padding: 5px 8px; width: 100%;
+.turn-side-label {
+  font-size: 11px; color: var(--muted); letter-spacing: .3em;
+  font-family: var(--font-serif);
 }
-
-.board-actions { display: flex; gap: 8px; }
+.turn-side-dot {
+  flex: 0 0 auto;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid rgba(243, 223, 162, .55);
+  box-shadow: inset -2px -3px 6px rgba(0, 0, 0, .5), inset 2px 3px 6px rgba(255, 255, 255, .18),
+              0 2px 7px rgba(0, 0, 0, .55);
+}
+.turn-side-name { font-family: var(--font-serif); font-size: 17px; letter-spacing: .06em; }
+.turn-side-who { font-size: 12.5px; color: var(--muted); }
+.turn-side-count {
+  font-size: 12px; color: var(--muted); margin-left: auto; padding-left: 12px;
+  font-family: var(--font-serif); letter-spacing: .08em; white-space: nowrap;
+}
+.turn-side-p1 .turn-side-dot { background: radial-gradient(circle at 34% 30%, #7ba0d0, var(--p1) 62%, #24405f); }
+.turn-side-p1 .turn-side-name { color: #9dbde3; }
+.turn-side-p2 .turn-side-dot { background: radial-gradient(circle at 34% 30%, #dd8a7c, var(--p2) 62%, #5d201b); }
+.turn-side-p2 .turn-side-name { color: #e59e94; }
+.turn-side-win .turn-side-dot { background: radial-gradient(circle at 34% 30%, var(--gold-lit), var(--gold) 62%, var(--gold-deep)); }
+.turn-side-win .turn-side-name { color: var(--gold-lit); }
+/* 自分の手番のときは灯りが当たっているように見せる */
+.turn-side-mine .turn-side-dot {
+  border-color: var(--move);
+  box-shadow: inset -2px -3px 6px rgba(0, 0, 0, .5), inset 2px 3px 6px rgba(255, 255, 255, .18),
+              0 0 12px rgba(116, 160, 138, .75);
+}
+.turn-side-mine .turn-side-who { color: var(--move); font-weight: 700; }
+/* ---- ボタン（真鍮の小札）---------------------------------------------- */
+.board-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .btn {
-  background: var(--panel-2);
-  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  letter-spacing: .06em;
+  color: var(--gold-lit);
+  background: linear-gradient(180deg, #33261a 0%, #1f170f 100%);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 8px 16px;
-  font-size: 13px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(243, 223, 162, .18), 0 2px 6px rgba(0, 0, 0, .5);
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
 }
-.btn:hover { background: #2f3745; }
-.btn-primary { background: #2f6fb5; border-color: #3b82c4; font-weight: 700; }
-.btn-warn { background: #7a5a1c; border-color: #a97c25; }
+.btn:hover {
+  background: linear-gradient(180deg, #4a3722 0%, #2a1f14 100%);
+  color: #fff3d4;
+  box-shadow: inset 0 1px 0 rgba(243, 223, 162, .3), 0 0 16px rgba(216, 180, 92, .25);
+}
+.btn:disabled { opacity: .38; cursor: not-allowed; box-shadow: none; }
+.btn-primary {
+  background: linear-gradient(180deg, #6d5119 0%, #3d2c0d 100%);
+  border-color: var(--gold);
+  color: #fff6dd;
+}
+.btn-primary:hover { background: linear-gradient(180deg, #8a6a24 0%, #4a360f 100%); }
+.btn-warn { background: linear-gradient(180deg, #5b431a 0%, #33240c 100%); border-color: #a97c25; }
+.btn-danger { background: linear-gradient(180deg, #522019 0%, #2c110d 100%); border-color: #8c3b30; color: #f0c9c2; }
+.btn-danger:hover { background: linear-gradient(180deg, #6b2a20 0%, #3a1712 100%); }
 .btn-ghost { background: transparent; }
+.btn-small { padding: 4px 10px; font-size: 12px; }
 
-/* ---- 盤面の要素 ------------------------------------------------------- */
-.grid-line { stroke: #4b5568; stroke-width: 2; }
-.loop-arc { fill: none; stroke-width: 3; opacity: .85; }
+/* ---- 盤面の中の要素 ---------------------------------------------------- */
+.grid-line { stroke: #9b8153; stroke-width: 1.8; opacity: .95; }
+.loop-arc { fill: none; stroke-width: 3.2; opacity: 1; }
 .loop-rank-1 { stroke: var(--loop1); }
 .loop-rank-2 { stroke: var(--loop2); }
 .loop-rank-3 { stroke: var(--move); }
-.node { fill: #6b7688; }
-/* 交点の座標の透かし。ボタンで表示・非表示を切り替える */
+.node { fill: #b09667; }
+
 .coord-label {
   text-anchor: middle; font-size: 12px; fill: var(--text);
-  opacity: .22; pointer-events: none; user-select: none;
+  font-family: var(--font-serif);
+  opacity: .32; pointer-events: none; user-select: none;
 }
 .hide-coords .coord-label { display: none; }
-/* ループ入口。駒が乗っても見えるよう駒より大きい輪にし、
-   破線の「選択中」「突撃可能」マーカーと区別するため実線・低不透明度にする */
-.node-entry { fill: none; stroke-width: 2; opacity: .3; }
+
+.node-entry { fill: none; stroke-width: 2.2; opacity: .42; }
 .hit { fill: transparent; cursor: pointer; }
 
-.mark-selected { fill: none; stroke: #ffffff; stroke-width: 2.5; stroke-dasharray: 5 4; }
-.mark-move { fill: var(--move); opacity: .55; }
+.mark-selected { fill: none; stroke: #fff3d4; stroke-width: 2.5; stroke-dasharray: 5 4; }
+.mark-move { fill: var(--move); opacity: .5; }
 .mark-charge { fill: none; stroke: var(--loop1); stroke-width: 3; stroke-dasharray: 6 5; }
 
-.piece-body { stroke: #10131a; stroke-width: 2; }
+/* 駒：金の縁取りをした彩色の玉 */
+/* 画像を入れていない騎の代替（色の円） */
+.piece-body { stroke: rgba(243, 223, 162, .75); stroke-width: 1.8; }
 .piece-p1 .piece-body { fill: var(--p1); }
 .piece-p2 .piece-body { fill: var(--p2); }
+
+/* 駒の絵柄と、その外側にうっすら出る陣営の色のフチ。
+   寸法は src/ui.js の PIECE_ART_R / PIECE_RING_R / PIECE_RING（SVGユニット）。
+   フチは絵柄の下に敷き、ぼかしをかけて色が分かる程度の淡い縁取りにしている。 */
+.piece-art { pointer-events: none; }
+.piece-ring {
+  fill: none;
+  filter: url(#lb-rim-blur);
+  opacity: .92;
+}
+.piece-p1 .piece-ring { stroke: var(--p1); }
+.piece-p2 .piece-ring { stroke: var(--p2); }
+
+/* HPは駒の右下。絵筆で斜めにひと塗りした上に数字を置く */
+.piece-hp-brush { pointer-events: none; }
+.brush-body { stroke: rgba(24, 14, 6, .55); stroke-width: .7; }
+.piece-p1 .brush-body { fill: var(--p1); }
+.piece-p2 .brush-body { fill: var(--p2); }
+.brush-highlight { fill: #fff6e2; opacity: .22; stroke: none; }
 .piece-hp {
-  text-anchor: middle; font-size: 20px; font-weight: 700;
-  fill: #fff; pointer-events: none;
+  text-anchor: middle; font-size: 11.5px; font-weight: 700;
+  font-family: var(--font-serif);
+  fill: #fff6e2; pointer-events: none;
+  paint-order: stroke; stroke: rgba(24, 14, 6, .45); stroke-width: 1.6;
 }
 .piece-label {
   text-anchor: middle; font-size: 12px; fill: var(--muted); pointer-events: none;
+  font-family: var(--font-serif);
 }
 
 .path-hover, .path-flash { fill: none; stroke-linecap: round; }
 .path-hover { stroke: var(--loop1); stroke-width: 7; opacity: .35; }
-.path-flash { stroke: #fff3c4; stroke-width: 8; opacity: .75; }
+.path-flash { stroke: #fff3c4; stroke-width: 8; opacity: .78; }
 
-.route-badge circle { fill: var(--loop1); stroke: #10131a; stroke-width: 2; cursor: pointer; }
-.route-badge text { text-anchor: middle; font-size: 15px; font-weight: 700; fill: #10131a; }
+.route-badge circle { fill: var(--loop1); stroke: #2b1f0c; stroke-width: 2; cursor: pointer; }
+.route-badge text {
+  text-anchor: middle; font-size: 15px; font-weight: 700; fill: #2b1f0c;
+  font-family: var(--font-serif);
+}
 
+/* ループ弧の進行方向マーク */
+.arc-dir { pointer-events: none; }
+.arc-dir polygon { stroke: #2b1f0c; stroke-width: 1.5; }
+.arc-dir.loop-rank-1 { fill: var(--loop1); stroke: none; opacity: .95; }
+.arc-dir.loop-rank-2 { fill: var(--loop2); stroke: none; opacity: .95; }
+.arc-dir.loop-rank-3 { fill: var(--move);  stroke: none; opacity: .95; }
+.arc-dir-path { fill: #fff3c4; stroke: none; opacity: 1; }
+
+/* ダメージなどの表示 */
 .fx-text {
-  text-anchor: middle; font-size: 26px; font-weight: 800;
-  paint-order: stroke; stroke: #10131a; stroke-width: 5;
+  text-anchor: middle; font-size: 26px; font-weight: 700;
+  font-family: var(--font-serif);
+  paint-order: stroke; stroke: #16100a; stroke-width: 5;
   animation: fx-rise 1.1s ease-out forwards;
   pointer-events: none;
 }
-.fx-normal { fill: #ffd166; }
-.fx-loop   { fill: #ff5d5d; font-size: 32px; }
-.fx-push   { fill: #7ee0c0; font-size: 22px; }
-.fx-wall   { fill: #ff9f43; font-size: 24px; }
-.fx-ko     { fill: #ffffff; font-size: 30px; }
+.fx-normal { fill: #f0cf86; }
+.fx-loop   { fill: #ef7a63; font-size: 32px; }
+.fx-push   { fill: #9ccbb4; font-size: 22px; }
+.fx-wall   { fill: #e8a05a; font-size: 24px; }
+.fx-ko     { fill: #fff6e2; font-size: 30px; }
 
 @keyframes fx-rise {
   0%   { opacity: 0; transform: translateY(6px); }
@@ -165,64 +360,145 @@ body {
   100% { opacity: 0; transform: translateY(-22px); }
 }
 
-/* ---- サイドパネル ----------------------------------------------------- */
-.side-panel { flex: 1 1 320px; min-width: 300px; max-width: 460px; display: grid; gap: 14px; }
+/* ---- サイドパネル（壁に掛けた小さな額）-------------------------------- */
+.panel-slot { flex: 1 1 320px; min-width: 300px; max-width: 460px; }
+.panel-slot:empty { display: none; }
+.side-panel { width: 100%; max-width: none; display: grid; gap: 14px; }
+
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 2px;
+}
+.panel-head-label {
+  font-family: var(--font-serif); font-size: 12px; color: var(--muted); letter-spacing: .22em;
+}
 
 .card {
-  background: var(--panel);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, .045), transparent 40%),
+    linear-gradient(180deg, #241a12 0%, var(--panel) 100%);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 12px 14px;
+  box-shadow:
+    inset 0 0 0 1px rgba(243, 223, 162, .07),
+    0 10px 26px rgba(0, 0, 0, .5);
 }
 .card-title {
-  font-size: 13px; margin: 0 0 8px; color: var(--muted);
-  letter-spacing: .06em; text-transform: uppercase; cursor: default;
+  font-family: var(--font-serif);
+  font-size: 13px; margin: 0 0 8px; color: var(--gold);
+  letter-spacing: .16em; cursor: default;
 }
 summary.card-title { cursor: pointer; }
-.card-title.p1 { color: var(--p1); }
-.card-title.p2 { color: var(--p2); margin-top: 14px; }
+.card-title.p1 { color: #8fb2dc; }
+.card-title.p2 { color: #dd9086; margin-top: 14px; }
 
-.knight-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
-.knight-row.dead { opacity: .35; text-decoration: line-through; }
-.knight-name { width: 44px; font-weight: 700; }
-.knight-hp { color: var(--muted); font-size: 12px; margin-left: auto; }
+/* 開閉の ▶（開いているときは ▼ 向きに回す）*/
+.card > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex; align-items: center; gap: 7px;
+}
+.card > summary::-webkit-details-marker { display: none; }
+.card > summary::before {
+  content: '▶';
+  display: inline-block;
+  font-size: 10px;
+  color: var(--gold-deep);
+  transition: transform .15s ease, color .15s ease;
+}
+.card[open] > summary::before { transform: rotate(90deg); color: var(--gold); }
+.card > summary:hover::before { color: var(--gold-lit); }
+.card:not([open]) > summary { margin-bottom: 0; }
+
+/* 駒のHP */
+.knight-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.knight-row.dead { opacity: .32; }
+.knight-row.dead .knight-hp { text-decoration: line-through; }
+
+/* 騎の記号（A1 など）と、絵柄を選ぶドロップダウン */
+.knight-code {
+  flex: 0 0 auto; width: 24px; text-align: center;
+  font-family: var(--font-serif); font-size: 12px; letter-spacing: .04em;
+  color: var(--gold); border: 1px solid var(--line); border-radius: 2px;
+  padding: 1px 0; background: rgba(0, 0, 0, .3);
+}
+.knight-pick {
+  flex: 1 1 auto; min-width: 0;
+  font-family: var(--font-serif); font-size: 13px; letter-spacing: .02em;
+  color: var(--text); background: #16100a;
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 3px 4px; cursor: pointer;
+}
+.knight-pick:hover { border-color: var(--gold); }
+.knight-pick:focus { outline: none; border-color: var(--gold-lit); }
+.knight-hp { color: var(--muted); font-size: 12px; flex: 0 0 auto; }
 .hp-bar { display: flex; gap: 3px; }
 .hp-pip {
-  width: 12px; height: 12px; border-radius: 3px;
-  background: #39414f; display: inline-block;
+  width: 12px; height: 12px; border-radius: 2px;
+  background: #33261a; display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5);
 }
-.hp-pip.on { background: var(--move); }
+.hp-pip.on {
+  background: linear-gradient(180deg, #9dc4ac, var(--move));
+  box-shadow: 0 0 6px rgba(116, 160, 138, .5);
+}
+#roster-p1 .hp-pip.on {
+  background: linear-gradient(180deg, #8fb2dc, var(--p1));
+  box-shadow: 0 0 6px rgba(74, 114, 168, .55);
+}
+#roster-p2 .hp-pip.on {
+  background: linear-gradient(180deg, #dd9086, var(--p2));
+  box-shadow: 0 0 6px rgba(176, 67, 56, .55);
+}
 
-.log { height: 220px; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+/* ログ */
+.log { height: 220px; overflow-y: auto; font-size: 12px; line-height: 1.65; padding-right: 4px; }
 .log-line { padding: 1px 0; color: var(--muted); }
 .log-move { color: var(--text); }
-.log-hit  { color: #ffd166; }
-.log-loop { color: #ff8a7a; font-weight: 700; }
-.log-push { color: #7ee0c0; }
-.log-ko   { color: #fff; font-weight: 700; }
-.log-win  { color: var(--loop1); font-weight: 700; }
-.log-warn { color: #f0b429; }
+.log-hit  { color: #e8c27a; }
+.log-loop { color: #ef8f78; font-weight: 700; }
+.log-push { color: #9ccbb4; }
+.log-ko   { color: #fff6e2; font-weight: 700; }
+.log-win  { color: var(--gold-lit); font-weight: 700; }
+.log-warn { color: #e0a94e; }
 
+/* 入力欄 */
 .debug-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-items: center;
 }
 .debug-grid label { color: var(--muted); font-size: 12px; }
-.debug-grid input {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
-  color: var(--text); padding: 5px 8px; width: 100%;
+.debug-grid input,
+.debug-grid select,
+.replay-select,
+.online-link input {
+  background: #16100a;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--text);
+  padding: 5px 8px;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.debug-grid input:focus,
+.debug-grid select:focus,
+.replay-select:focus,
+.online-link input:focus {
+  outline: none; border-color: var(--gold); box-shadow: 0 0 0 1px rgba(200, 164, 74, .35);
 }
 .debug-actions { display: flex; gap: 8px; margin-top: 10px; }
-.quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .quick-label { color: var(--muted); font-size: 12px; }
-.btn-small { padding: 4px 10px; font-size: 12px; }
 .check-cell { display: flex; align-items: center; gap: 6px; }
 .check-cell label { color: var(--text); font-size: 12px; }
-.note { color: var(--muted); font-size: 11px; margin: 8px 0 0; line-height: 1.6; }
-.note code { background: var(--panel-2); padding: 1px 4px; border-radius: 3px; }
-.error { color: #ff6b6b; font-size: 12px; margin: 6px 0 0; }
+.note { color: var(--muted); font-size: 11px; margin: 8px 0 0; line-height: 1.7; }
+.note code { background: #16100a; padding: 1px 4px; border-radius: 2px; color: var(--gold); }
+.error { color: #e2726b; font-size: 12px; margin: 6px 0 0; }
 
-.rules { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.8; color: var(--text); }
-.rules b { color: var(--loop1); }
+.rules { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.9; color: var(--text); }
+.rules b { color: var(--gold); }
 
 .legend {
   display: inline-block; width: 14px; height: 3px; vertical-align: middle;
@@ -231,100 +507,84 @@ summary.card-title { cursor: pointer; }
 .legend-1 { background: var(--loop1); }
 .legend-2 { background: var(--loop2); }
 
-/* ---- 盤面左の手番表示 ------------------------------------------------- */
-.board-row { display: flex; align-items: stretch; gap: 12px; }
-
-.turn-side {
-  flex: 0 0 96px;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 14px 8px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  border-top: 5px solid var(--muted);
-  text-align: center;
+/* ---- オンライン対戦 ---------------------------------------------------- */
+.online-status {
+  font-size: 12px; margin: 0 0 8px; padding: 7px 9px; border-radius: 2px;
+  background: #16100a; border-left: 3px solid var(--muted); color: var(--muted);
 }
-.turn-side-label { font-size: 11px; color: var(--muted); letter-spacing: .16em; }
-.turn-side-dot {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--muted); border: 3px solid #10131a;
+.online-ok    { border-left-color: var(--move);  color: #9ccbb4; }
+.online-wait  { border-left-color: var(--gold);  color: var(--gold-lit); }
+.online-warn  { border-left-color: #e0a94e;      color: #e0a94e; }
+.online-error { border-left-color: #c4564d;      color: #e2726b; }
+.role-note {
+  font-size: 12px; margin: 0 0 8px; color: var(--gold-lit);
+  font-family: var(--font-serif); letter-spacing: .04em;
 }
-.turn-side-name { font-size: 13px; font-weight: 700; }
-.turn-side-who { font-size: 12px; color: var(--muted); line-height: 1.4; }
-.turn-side-count { font-size: 11px; color: var(--muted); margin-top: auto; }
+.role-note:empty { display: none; }
+.online-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.online-link { display: flex; gap: 6px; margin-top: 8px; }
+.online-link input { flex: 1 1 auto; min-width: 0; }
+.online-share { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.online-share .btn { text-decoration: none; display: inline-block; }
 
-.turn-side-p1 { border-top-color: var(--p1); }
-.turn-side-p1 .turn-side-dot { background: var(--p1); }
-.turn-side-p1 .turn-side-name { color: var(--p1); }
-.turn-side-p2 { border-top-color: var(--p2); }
-.turn-side-p2 .turn-side-dot { background: var(--p2); }
-.turn-side-p2 .turn-side-name { color: var(--p2); }
-.turn-side-win { border-top-color: var(--loop1); }
-.turn-side-win .turn-side-dot { background: var(--loop1); }
-.turn-side-win .turn-side-name { color: var(--loop1); }
-
-/* 自分の手番のときは目立たせる */
-.turn-side-mine { box-shadow: 0 0 0 2px var(--move) inset; }
-.turn-side-mine .turn-side-who { color: var(--move); font-weight: 700; }
-
-/* ---- 先攻後攻の選択・共有ボタン --------------------------------------- */
 .side-choice { margin: 4px 0 10px; }
 .side-choice-buttons { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .side-btn.is-active {
-  background: #2f6fb5; border-color: #3b82c4; color: #fff; font-weight: 700;
+  background: linear-gradient(180deg, #6d5119 0%, #3d2c0d 100%);
+  border-color: var(--gold); color: #fff6dd;
 }
-.online-share { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
-.online-share .btn { text-decoration: none; display: inline-block; }
-.btn-danger { background: #7a2f2f; border-color: #a94242; }
-.btn-danger:hover { background: #8f3838; }
-
-/* ---- ループ弧の進行方向マーク ----------------------------------------- */
-/* 選択中の騎がループ突撃で通る弧に、どちら回りに進むかを▲で示す */
-.arc-dir { pointer-events: none; }
-.arc-dir polygon { stroke: #10131a; stroke-width: 1.5; }
-.arc-dir.loop-rank-1 { fill: var(--loop1); stroke: none; opacity: .9; }
-.arc-dir.loop-rank-2 { fill: var(--loop2); stroke: none; opacity: .9; }
-.arc-dir.loop-rank-3 { fill: var(--move);  stroke: none; opacity: .9; }
-/* 経路ハイライト中はより明るく */
-.arc-dir-path { fill: #fff3c4; stroke: none; opacity: 1; }
 
 /* ---- リプレイ --------------------------------------------------------- */
 .replay-bar { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.replay-select {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
-  color: var(--text); padding: 5px 8px; width: 100%; font-size: 12px;
-}
 .replay-buttons { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.replay-pos { color: var(--muted); font-size: 12px; margin-left: auto; }
-.turn-replay { border-left-color: var(--loop2); color: var(--loop2); }
-.board.is-replay { border-color: var(--loop2); box-shadow: 0 0 0 2px rgba(167, 139, 250, .35); }
-
-/* ---- ログ／リプレイ枠の左右切り替え ------------------------------------ */
-/* ログの枠は左右どちらのスロットにも入れられる。空のスロットは場所を取らない */
-.log-slot:empty { display: none; }
-
-.log-slot-left {
-  flex: 0 0 340px;
-  max-width: 94vw;
-  align-self: stretch;
+.replay-pos {
+  color: var(--muted); font-size: 12px; margin-left: auto;
+  font-family: var(--font-serif); letter-spacing: .06em;
 }
+/* リプレイ中は額縁に銀の光を差して区別する */
+.board.is-replay { box-shadow: inset 0 0 0 2px rgba(186, 179, 160, .55), inset 0 0 40px rgba(0, 0, 0, .55); }
 
-/* カード見出しと切り替えボタンを横並びにする */
-.card-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 8px;
-}
-.card-head .card-title { margin: 0; }
+/* ---- パネルを左に置いたとき -------------------------------------------- */
+.panel-slot-left .side-panel { position: sticky; top: 12px; }
+.panel-slot-left .log { height: 320px; }
 
-/* 左に置いたときは盤面と同じ高さまで使えるので、ログを縦に長く見せる */
-.log-slot-left .log-card { position: sticky; top: 12px; }
-.log-slot-left .log { height: 460px; }
+/* ---- 画面が狭いとき ----------------------------------------------------
+   1200px 以下：盤面とパネルが縦に積まれる。積まれると左右の指定は意味を持たない
+                （どちらを選んでも盤面の下になる）ので、切り替えボタンは隠す。
+   760px 以下（スマートフォン）：
+     - 中身をすべて中央に寄せる
+     - 額縁を画面幅いっぱいまで広げる（枠の太さの比率は PC と同じ）        */
 
-/* 画面が狭くて横に並べきれないときは、盤面 → ログ → その他 の縦並びにする
-   （ログが盤面より上へ回り込んで盤面が押し下げられるのを防ぐ） */
 @media (max-width: 1200px) {
-  .log-slot-left { order: 1; flex: 1 1 320px; }
-  .side-panel { order: 2; }
-  .log-slot-left .log-card { position: static; }
-  .log-slot-left .log { height: 260px; }
+  .app { justify-content: center; }
+  .panel-slot-left { order: 1; }
+  .panel-slot-left .side-panel { position: static; }
+  .panel-slot-left .log { height: 220px; }
+  .panel-slot { flex: 1 1 100%; min-width: 0; max-width: none; }
+  .side-panel { max-width: 520px; margin: 0 auto; }
+  .panel-head { display: none; }
+}
+
+@media (max-width: 900px) {
+  .app { padding: 8px 12px 32px; }
+  .app-header h1 { font-size: 23px; }
+}
+
+@media (max-width: 760px) {
+  .app { padding: 6px 5px 28px; gap: 14px; }
+  .app-header { padding: 10px 6px 0; text-align: center; }
+  .board-panel { width: 100%; }
+  .board-row { justify-content: center; }
+  .artframe {
+    /* 画面の左右いっぱいまで広げる。枠の太さの倍率（--fb）は PC と同じ 1 のまま。
+       細くすると盤面は広がるが、上下左右のレールが潰れて彫りが平たく見えるため、
+       額縁の見た目を優先して原画の比率を保つ。 */
+    --fw: calc(100vw - 10px);
+    margin: 0 auto;
+  }
+  .turn { font-size: 15px; padding: 8px 12px; gap: 10px; }
+  .turn-side-name { font-size: 15px; }
+  .turn-side-label { letter-spacing: .18em; }
+  .board-actions { justify-content: center; }
+  .hint, .board-name { text-align: center; }
 }

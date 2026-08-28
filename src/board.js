@@ -330,8 +330,13 @@ window.LB = window.LB || {};
       viewBox: function () {
         var b = contentBounds();
         var m = 16; // 線幅ぶんの余白
-        return (b.min.x - m) + ' ' + (b.min.y - m) + ' ' +
-               (b.max.x - b.min.x + m * 2) + ' ' + (b.max.y - b.min.y + m * 2);
+        var w = b.max.x - b.min.x + m * 2;
+        var h = b.max.y - b.min.y + m * 2;
+        // 額縁が盤面の種類によって変形しないよう、表示領域は常に正方形にする
+        var s = Math.max(w, h);
+        var x = b.min.x - m - (s - w) / 2;
+        var y = b.min.y - m - (s - h) / 2;
+        return x + " " + y + " " + s + " " + s;
       }
     };
   }

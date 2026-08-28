@@ -10,24 +10,30 @@
 
 <header class="app-header">
   <h1>Loop Battle <span class="ver">Ver.0.4 開発中</span></h1>
-  <p class="sub">6×6交点盤 / 3騎 VS 3騎 / 同一PCまたはオンラインで2人対戦</p>
 </header>
 
 <main class="app">
 
-  <div id="log-slot-left" class="log-slot log-slot-left"></div>
+  <div id="panel-slot-left" class="panel-slot panel-slot-left"></div>
 
   <section class="board-panel">
-    <div id="turn" class="turn turn-p1">Player 1 のターン</div>
-    <div class="board-row">
+    <!-- 手番表示：色駒アイコンもここにまとめている -->
+    <div id="turn" class="turn turn-p1">
       <div id="turn-side" class="turn-side turn-side-p1">
-        <div class="turn-side-label">手番</div>
-        <div id="turn-side-dot" class="turn-side-dot"></div>
-        <div id="turn-side-name" class="turn-side-name">Player 1</div>
-        <div id="turn-side-who" class="turn-side-who"></div>
-        <div id="turn-side-count" class="turn-side-count">Turn 1</div>
+        <span class="turn-side-label">手番</span>
+        <span id="turn-side-dot" class="turn-side-dot"></span>
+        <span id="turn-side-name" class="turn-side-name">Player 1</span>
+        <span id="turn-side-who" class="turn-side-who"></span>
+        <span id="turn-side-count" class="turn-side-count">Turn 1</span>
       </div>
-      <svg id="board" class="board" xmlns="http://www.w3.org/2000/svg"></svg>
+      <span id="turn-text" class="turn-text"></span>
+    </div>
+    <div class="board-row">
+      <div class="artframe">
+        <div class="artframe-inner">
+          <svg id="board" class="board" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
     </div>
     <p id="board-name" class="board-name"></p>
     <p id="hint" class="hint">自軍の騎をクリックして選択してください。</p>
@@ -39,9 +45,16 @@
     </div>
   </section>
 
-  <aside class="side-panel">
+  <div id="panel-slot-right" class="panel-slot panel-slot-right">
+  <aside class="side-panel" id="side-panel">
 
-    <details class="card">
+    <!-- パネル全体の位置切り替え。4つの枠はまとめて左右へ動かせる -->
+    <div class="panel-head">
+      <span class="panel-head-label">パネル</span>
+      <button id="panel-side-toggle" class="btn btn-small" title="4つの枠をまとめて盤面の左右へ移動します">◀ 左へ</button>
+    </div>
+
+    <details class="card" id="rules-card">
       <summary class="card-title">ルール早見表</summary>
       <ul class="rules">
         <li>自分のターンに自軍の騎を1騎選び、1回だけ行動する。</li>
@@ -63,8 +76,68 @@
       </p>
     </details>
 
-    <div class="card" id="online-card">
-      <h2 class="card-title">オンライン対戦</h2>
+    <details class="card" id="log-card" open>
+      <summary class="card-title">ログ / リプレイ</summary>
+      <div class="replay-bar">
+        <select id="replay-source" class="replay-select"></select>
+        <div class="replay-buttons">
+          <button id="replay-play" class="btn btn-small">▶ 再生</button>
+          <button id="replay-stop" class="btn btn-small">■ 停止</button>
+          <button id="replay-prev" class="btn btn-small" title="1コマ戻る">◀</button>
+          <button id="replay-next" class="btn btn-small" title="1コマ進む">▶|</button>
+          <span id="replay-pos" class="replay-pos">—</span>
+        </div>
+      </div>
+      <div id="log" class="log"></div>
+      <p class="note">
+        直近3対局までを振り返れます。再生すると盤面とログが1手ずつ進み、「停止」で対局に戻ります。<br>
+        リプレイ中は盤面を操作できません。記録はページを開いている間だけ保持されます。
+      </p>
+    </details>
+
+    <details class="card" id="roster-card" open>
+      <summary class="card-title">駒のHP</summary>
+      <h2 class="card-title p1">Player 1（青 / 下側）</h2>
+      <div id="roster-p1" class="roster"></div>
+      <h2 class="card-title p2">Player 2（赤 / 上側）</h2>
+      <div id="roster-p2" class="roster"></div>
+    </details>
+
+    <details class="card" id="debug-card" open>
+      <summary class="card-title">デバッグ設定（数値調整）</summary>
+      <div class="quick-row">
+        <span class="quick-label">HP比較：</span>
+        <button id="quick-hp5" class="btn btn-small">HP 5 で開始</button>
+        <button id="quick-hp6" class="btn btn-small">HP 6 で開始</button>
+      </div>
+      <div class="debug-grid">
+        <label>最大HP</label>            <input id="cfg-max-hp" type="number" min="1" step="1">
+        <label>通常攻撃ダメージ</label>   <input id="cfg-normal-damage" type="number" min="0" step="1">
+        <label>ループ突撃ダメージ</label> <input id="cfg-loop-damage" type="number" min="0" step="1">
+        <label>ノックバック距離</label>   <input id="cfg-knockback" type="number" min="0" step="1">
+        <label>壁激突ダメージ</label>     <input id="cfg-wall-damage" type="number" min="0" step="1">
+        <label>盤面の種類</label>          <select id="cfg-board-type"></select>
+        <label>ループ入口までの歩数</label>   <input id="cfg-loop-entry" type="number" min="1" step="1">
+        <label>P1 初期配置（マス番号）</label> <input id="cfg-place-p1" type="text" placeholder="26 27 28">
+        <label>P2 初期配置（マス番号）</label> <input id="cfg-place-p2" type="text" placeholder="9 10 11">
+        <label>連鎖押し出し</label>
+        <span class="check-cell"><input id="cfg-chain" type="checkbox"><label for="cfg-chain">有効</label></span>
+      </div>
+      <p class="note">
+        初期配置は<b>盤面に表示されているマス番号</b>（例 <code>26 27 28</code>）を空白区切りで指定。<br>
+        従来の「行,列」形式（例 <code>4,1</code>）も引き続き使えます。<br>
+        「ループ入口までの歩数」は 1 でループ入口に立っている必要あり、99 で Ver.0.1 の挙動になります。
+      </p>
+      <p id="debug-error" class="error"></p>
+      <div class="debug-actions">
+        <button id="debug-apply" class="btn">適用してリスタート</button>
+        <button id="debug-reset" class="btn btn-ghost">初期値に戻す</button>
+      </div>
+      <p class="note">恒久的に変更する場合は <code>src/config.js</code> を編集してください。</p>
+    </details>
+
+    <details class="card" id="online-card" open>
+      <summary class="card-title">オンライン対戦</summary>
       <p id="online-status" class="online-status">ローカル対戦中（同じPCで2人交互に操作）</p>
       <p id="role-note" class="role-note"></p>
 
@@ -100,74 +173,10 @@
         共有ボタンは新しいタブで開くので、<b>この対戦ページは閉じずにそのまま使えます</b>。<br>
         対局データは2台のブラウザ間で直接やり取りされます（接続の仲介にのみ外部サービスを使用）。
       </p>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title p1">Player 1（青 / 下側）</h2>
-      <div id="roster-p1" class="roster"></div>
-      <h2 class="card-title p2">Player 2（赤 / 上側）</h2>
-      <div id="roster-p2" class="roster"></div>
-    </div>
-
-    <div id="log-slot-right" class="log-slot log-slot-right">
-    <!-- ログ/リプレイの枠。左右どちらのスロットにも入れ替えられる -->
-    <div class="card log-card" id="log-card">
-      <div class="card-head">
-        <h2 class="card-title">ログ / リプレイ</h2>
-        <button id="log-side-toggle" class="btn btn-small" title="ログの表示位置を左右に切り替えます">◀ 左へ</button>
-      </div>
-      <div class="replay-bar">
-        <select id="replay-source" class="replay-select"></select>
-        <div class="replay-buttons">
-          <button id="replay-play" class="btn btn-small">▶ 再生</button>
-          <button id="replay-stop" class="btn btn-small">■ 停止</button>
-          <button id="replay-prev" class="btn btn-small" title="1コマ戻る">◀</button>
-          <button id="replay-next" class="btn btn-small" title="1コマ進む">▶|</button>
-          <span id="replay-pos" class="replay-pos">—</span>
-        </div>
-      </div>
-      <div id="log" class="log"></div>
-      <p class="note">
-        直近3対局までを振り返れます。再生すると盤面とログが1手ずつ進み、「停止」で対局に戻ります。<br>
-        リプレイ中は盤面を操作できません。記録はページを開いている間だけ保持されます。
-      </p>
-    </div>
-    </div>
-    <details class="card" open>
-      <summary class="card-title">デバッグ設定（数値調整）</summary>
-      <div class="quick-row">
-        <span class="quick-label">HP比較：</span>
-        <button id="quick-hp5" class="btn btn-small">HP 5 で開始</button>
-        <button id="quick-hp6" class="btn btn-small">HP 6 で開始</button>
-      </div>
-      <div class="debug-grid">
-        <label>最大HP</label>            <input id="cfg-max-hp" type="number" min="1" step="1">
-        <label>通常攻撃ダメージ</label>   <input id="cfg-normal-damage" type="number" min="0" step="1">
-        <label>ループ突撃ダメージ</label> <input id="cfg-loop-damage" type="number" min="0" step="1">
-        <label>ノックバック距離</label>   <input id="cfg-knockback" type="number" min="0" step="1">
-        <label>壁激突ダメージ</label>     <input id="cfg-wall-damage" type="number" min="0" step="1">
-        <label>盤面の種類</label>          <select id="cfg-board-type"></select>
-        <label>ループ入口までの歩数</label>   <input id="cfg-loop-entry" type="number" min="1" step="1">
-        <label>P1 初期配置（マス番号）</label> <input id="cfg-place-p1" type="text" placeholder="26 27 28">
-        <label>P2 初期配置（マス番号）</label> <input id="cfg-place-p2" type="text" placeholder="9 10 11">
-        <label>連鎖押し出し</label>
-        <span class="check-cell"><input id="cfg-chain" type="checkbox"><label for="cfg-chain">有効</label></span>
-      </div>
-      <p class="note">
-        初期配置は<b>盤面に表示されているマス番号</b>（例 <code>26 27 28</code>）を空白区切りで指定。<br>
-        従来の「行,列」形式（例 <code>4,1</code>）も引き続き使えます。<br>
-        「ループ入口までの歩数」は 1 でループ入口に立っている必要あり、99 で Ver.0.1 の挙動になります。
-      </p>
-      <p id="debug-error" class="error"></p>
-      <div class="debug-actions">
-        <button id="debug-apply" class="btn">適用してリスタート</button>
-        <button id="debug-reset" class="btn btn-ghost">初期値に戻す</button>
-      </div>
-      <p class="note">恒久的に変更する場合は <code>src/config.js</code> を編集してください。</p>
     </details>
 
-
   </aside>
+  </div>
 </main>
 
 <script src="src/config.js"></script>

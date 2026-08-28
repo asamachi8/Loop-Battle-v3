@@ -10,6 +10,33 @@ window.LB = window.LB || {};
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var rules = LB.rules;
 
+  // 駒の寸法（SVGユニット）。1ユニットは PC の盤面で約1px。
+  //   PIECE_ART_R  … 絵柄の半径。メダリオンはこの 91% ほどを占める
+  //   PIECE_RING_R … 陣営の色のフチを描く円の半径（メダリオンの縁のすぐ内側）
+  //   PIECE_RING   … フチの線の太さ。ぼかしをかけるので細くてよい
+  //   PIECE_R      … 画像が読めないときの代替の円の半径
+  //   MARK_SEL_R   … 選択中の騎を囲む破線リングの半径
+  //   MARK_CHARGE_R… ループ突撃できる敵を囲むリングの半径
+  // 交点の間隔は70ユニットなので、半径35を超えると隣の駒と重なる。
+  var PIECE_ART_R = 27;
+  var PIECE_RING_R = 25.0;
+  var PIECE_RING = 2.6;
+  var PIECE_R = 26;
+  var MARK_SEL_R = 31;
+  var MARK_CHARGE_R = 33;
+  var ENTRY_R = 28;      // ループ入口の輪。選択リングと重ならない位置に置く
+
+  // HPの絵筆バッジ。駒の右下に斜めに置く
+  var HP_BADGE = { x: 14, y: 14, angle: -28 };
+  // 絵筆のひと塗り（左右に細り、縁が不揃い）
+  var BRUSH_D = 'M -9.4 -0.6 C -7.6 -3.7 -4.2 -4.9 -0.4 -4.5'
+              + ' C 3.4 -4.1 7.3 -3.5 9.5 -1.8 C 10.4 -1.1 10.0 0.7 8.6 2.0'
+              + ' C 6.4 3.9 2.6 4.9 -1.4 4.6 C -5.0 4.4 -8.3 3.4 -9.4 1.7'
+              + ' C -10.0 0.9 -9.9 0.1 -9.4 -0.6 Z';
+  // 塗り重ねの明るいスジ（筆の毛の跡）
+  var BRUSH_HL_D = 'M -7.2 -1.9 C -4.4 -3.3 0.6 -3.5 5.6 -2.5'
+                 + ' C 3.0 -1.2 -3.4 -0.6 -7.2 -1.9 Z';
+
   function svgEl(tag, attrs) {
     var e = document.createElementNS(SVG_NS, tag);
     for (var k in attrs) {
@@ -51,6 +78,15 @@ window.LB = window.LB || {};
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     svg.setAttribute('viewBox', board.viewBox());
 
+    // 陣営の色のフチをぼかすためのフィルタ。stdDeviation はSVGユニット。
+    var defs = svgEl('defs');
+    var blur = svgEl('filter', {
+      id: 'lb-rim-blur', x: '-40%', y: '-40%', width: '180%', height: '180%'
+    });
+    blur.appendChild(svgEl('feGaussianBlur', { stdDeviation: 1.2 }));
+    defs.appendChild(blur);
+    svg.appendChild(defs);
+
     var gStatic = svgEl('g', { 'class': 'layer-static' });
     // 通常経路（グリッド線）
     board.gridLines().forEach(function (ln) {
@@ -79,7 +115,7 @@ window.LB = window.LB || {};
     board.entryPoints().forEach(function (e) {
       var p = board.pointXY(e.r, e.c);
       gStatic.appendChild(svgEl('circle', {
-        cx: p.x, cy: p.y, r: 30, 'class': 'node-entry loop-rank-' + e.rank
+        cx: p.x, cy: p.y, r: ENTRY_R, 'class': 'node-entry loop-rank-' + e.rank
       }));
     });
     svg.appendChild(gStatic);
@@ -440,7 +476,7 @@ window.LB = window.LB || {};
       // 選択中の騎
       var sp = board.pointXY(this.sel.knight.r, this.sel.knight.c);
       this.layers.hint.appendChild(svgEl('circle', {
-        cx: sp.x, cy: sp.y, r: 28, 'class': 'mark-selected'
+        cx: sp.x, cy: sp.y, r: MARK_SEL_R, 'class': 'mark-selected'
       }));
       // 移動可能地点
       this.sel.moves.forEach(function (m) {
@@ -469,7 +505,7 @@ window.LB = window.LB || {};
         var t = rules.getKnight(game.state, tid);
         var p = board.pointXY(t.r, t.c);
         self.layers.hint.appendChild(svgEl('circle', {
-          cx: p.x, cy: p.y, r: 30, 'class': 'mark-charge'
+          cx: p.x, cy: p.y, r: MARK_CHARGE_R, 'class': 'mark-charge'
         }));
       });
     }
@@ -479,11 +515,56 @@ window.LB = window.LB || {};
       if (!k.alive) return;
       var p = board.pointXY(k.r, k.c);
       var g = svgEl('g', { 'class': 'piece piece-' + k.owner });
-      g.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: 22, 'class': 'piece-body' }));
-      var hp = svgEl('text', { x: p.x, y: p.y + 7, 'class': 'piece-hp' });
+
+      // 絵柄。割り当てが無ければ従来どおり色の円を描く。
+      // 先に陣営の色のフチを敷き、その上に絵柄を重ねる。フチはぼかしてあるので
+      // メダリオンの縁の外側にだけ、色の分かる淡い縁取りとして残る。
+      var art = LB.characterFor && LB.characterFor(k.id);
+      if (art) {
+        g.appendChild(svgEl('circle', {
+          cx: p.x, cy: p.y, r: PIECE_RING_R,
+          'stroke-width': PIECE_RING, 'class': 'piece-ring'
+        }));
+        var img = svgEl('image', {
+          x: p.x - PIECE_ART_R, y: p.y - PIECE_ART_R,
+          width: PIECE_ART_R * 2, height: PIECE_ART_R * 2,
+          href: art.src, 'class': 'piece-art'
+        });
+        var ttl = svgEl('title');
+        ttl.textContent = art.name;
+        img.appendChild(ttl);
+        // 画像が読めない環境（ファイル欠品など）では従来の色の円に戻す
+        (function (group, image, pt) {
+          image.addEventListener('error', function () {
+            group.insertBefore(
+              svgEl('circle', { cx: pt.x, cy: pt.y, r: PIECE_R, 'class': 'piece-body' }),
+              group.firstChild
+            );
+            if (image.parentNode) image.parentNode.removeChild(image);
+          });
+        }(g, img, p));
+        g.appendChild(img);
+      } else {
+        g.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: PIECE_R, 'class': 'piece-body' }));
+        g.appendChild(svgEl('circle', {
+          cx: p.x, cy: p.y, r: PIECE_RING_R,
+          'stroke-width': PIECE_RING, 'class': 'piece-ring'
+        }));
+      }
+
+      // HPは駒の右下。絵筆で斜めにひと塗りした上に数字を置く
+      var bx = p.x + HP_BADGE.x, by = p.y + HP_BADGE.y;
+      var brush = svgEl('g', {
+        'class': 'piece-hp-brush',
+        transform: 'translate(' + bx + ',' + by + ') rotate(' + HP_BADGE.angle + ')'
+      });
+      brush.appendChild(svgEl('path', { d: BRUSH_D, 'class': 'brush-body' }));
+      brush.appendChild(svgEl('path', { d: BRUSH_HL_D, 'class': 'brush-highlight' }));
+      g.appendChild(brush);
+      var hp = svgEl('text', { x: bx, y: by + 3.9, 'class': 'piece-hp' });
       hp.textContent = k.hp;
       g.appendChild(hp);
-      var lb = svgEl('text', { x: p.x, y: p.y + 36, 'class': 'piece-label' });
+      var lb = svgEl('text', { x: p.x, y: p.y + 38, 'class': 'piece-label' });
       lb.textContent = k.label;
       g.appendChild(lb);
       self.layers.pieces.appendChild(g);
@@ -504,6 +585,7 @@ window.LB = window.LB || {};
   };
 
   UI.prototype.renderStatus = function () {
+    var self = this;
     var game = this.game;
     var state = this.viewState();
     var dom = this.dom;
@@ -513,19 +595,18 @@ window.LB = window.LB || {};
     if (replaying) dom.board.classList.add('is-replay');
     else dom.board.classList.remove('is-replay');
 
-    // ターン表示 / 勝敗表示
+    // 手番表示 / 勝敗表示
+    // 手番の中身（色駒アイコン・プレイヤー名・Turn数）は renderTurnSide が担当し、
+    // ここでは枠の色と、リプレイ・決着といった特別な状態の文言だけを出す。
     dom.turn.className = 'turn turn-' + state.currentPlayer + (replaying ? ' turn-replay' : '');
     if (state.winner) {
       dom.turn.className = 'turn turn-win';
-      dom.turn.textContent = state.winner === 'draw'
-        ? 'DRAW'
-        : LB.PLAYER_LABEL[state.winner] + ' WIN!';
+      // 勝者の名前は手番表示の側が出すので、ここは短い一言だけにする
+      dom.turnText.textContent = state.winner === 'draw' ? 'DRAW' : 'WIN!';
     } else {
-      dom.turn.textContent = (replaying ? '▶ リプレイ ' : '')
-        + LB.PLAYER_LABEL[state.currentPlayer] + ' のターン（Turn ' + state.turnCount + '）';
+      dom.turnText.textContent = replaying ? '▶ リプレイ再生中' : '';
     }
 
-    // 盤面左の手番表示
     this.renderTurnSide();
 
     // 各騎のHP
@@ -535,9 +616,28 @@ window.LB = window.LB || {};
       state.knights.filter(function (k) { return k.owner === owner; }).forEach(function (k) {
         var row = document.createElement('div');
         row.className = 'knight-row' + (k.alive ? '' : ' dead');
-        var name = document.createElement('span');
-        name.className = 'knight-name';
-        name.textContent = '騎' + k.label;
+
+        // 騎の記号（A1 など）と、絵柄を選ぶドロップダウン。
+        // 6種類のどれを何騎に使ってもよい（相手と同じ絵柄でも構わない）。
+        var code = document.createElement('span');
+        code.className = 'knight-code';
+        code.textContent = k.label;
+
+        var name = document.createElement('select');
+        name.className = 'knight-name knight-pick';
+        name.title = '騎' + k.label + ' の絵柄を選びます';
+        (LB.PIECE_CHARACTERS || []).forEach(function (ch) {
+          var op = document.createElement('option');
+          op.value = ch.key;
+          op.textContent = ch.name;
+          name.appendChild(op);
+        });
+        name.value = LB.pieceArt[k.id] || '';
+        (function (knightId) {
+          name.addEventListener('change', function () {
+            if (self.onPieceArtChange) self.onPieceArtChange(knightId, this.value);
+          });
+        }(k.id));
         var bar = document.createElement('span');
         bar.className = 'hp-bar';
         for (var i = 0; i < k.maxHp; i++) {
@@ -548,6 +648,7 @@ window.LB = window.LB || {};
         var num = document.createElement('span');
         num.className = 'knight-hp';
         num.textContent = k.alive ? (k.hp + ' / ' + k.maxHp) : 'KO';
+        row.appendChild(code);
         row.appendChild(name);
         row.appendChild(bar);
         row.appendChild(num);
