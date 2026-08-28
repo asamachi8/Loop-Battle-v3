@@ -45,15 +45,20 @@ window.LB = window.LB || {};
     }
   ];
 
-  // 駒の絵柄（キャラクター）の一覧。assets/pieces/ の Web用ファイルを指す。
-  // 元画像（1254px の PNG）は同じフォルダに日本語ファイル名のまま置いてある。
+  // 駒の絵柄（キャラクター）の一覧。
+  // コレクションごとにフォルダを分けている（1コレクション = 1フォルダ）。
+  //   assets/pieces/<コレクション>/           … ゲームが読み込む Web用（176px）
+  //   assets/pieces/<コレクション>/original/  … 元画像。ゲームは読み込まない
+  // フォルダ名は半角英数字とハイフンにする（公開先で確実に読めるようにするため）。
+  // 画面に出す日本語のコレクション名は src/main.js の CHAR_COLLECTIONS が持つ。
+  var GALLERY = 'assets/pieces/fantasy-museum/';
   LB.PIECE_CHARACTERS = [
-    { key: 'amerigo',    name: 'アメリゴ船長',         src: 'assets/pieces/amerigo.png' },
-    { key: 'aosuke',     name: 'シンガーアオスケ',      src: 'assets/pieces/aosuke.png' },
-    { key: 'marguerite', name: 'マルグリットメイド長',   src: 'assets/pieces/marguerite.png' },
-    { key: 'jane-doe',   name: 'ジェーンドゥ',         src: 'assets/pieces/jane-doe.png' },
-    { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: 'assets/pieces/tsuzumi.png' },
-    { key: 'asamachi',   name: 'ガイドあさまち',        src: 'assets/pieces/asamachi.png' }
+    { key: 'amerigo',    name: 'アメリゴ船長',         src: GALLERY + 'amerigo.png' },
+    { key: 'aosuke',     name: 'シンガーアオスケ',      src: GALLERY + 'aosuke.png' },
+    { key: 'marguerite', name: 'マルグリットメイド長',   src: GALLERY + 'marguerite.png' },
+    { key: 'jane-doe',   name: 'ジェーンドゥ',         src: GALLERY + 'jane-doe.png' },
+    { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: GALLERY + 'tsuzumi.png' },
+    { key: 'asamachi',   name: 'ガイドあさまち',        src: GALLERY + 'asamachi.png' }
   ];
 
   // 既定の割り当て（騎のID → キャラクターのキー）。

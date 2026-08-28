@@ -371,6 +371,71 @@
     };
   }
 
+  // ---- キャラクター紹介 -------------------------------------------------
+  // 駒に使える絵柄を、盤上より大きいサイズで並べて見せる枠。
+  // コレクションを増やしたくなったら CHAR_COLLECTIONS に足す。
+
+  var CHAR_COLLECTIONS = {
+    gallery: {
+      title: '幻想肖像画美術館',
+      note: '駒に使える6枚。「駒のHP」枠のドロップダウンで、どの騎に使うか選べます。',
+      keys: null   // null = LB.PIECE_CHARACTERS の全部
+    },
+    next: {
+      title: 'To Be Continued…',
+      note: '新しい駒ができたら、ここに並びます。',
+      keys: []     // 空 = まだ中身なし
+    }
+  };
+
+  function renderCharGallery(id) {
+    var box = dom.charGallery;
+    var col = CHAR_COLLECTIONS[id] || CHAR_COLLECTIONS.gallery;
+    box.innerHTML = '';
+
+    var note = document.createElement('p');
+    note.className = 'char-note';
+    note.textContent = col.note;
+    box.appendChild(note);
+
+    var list = col.keys === null
+      ? LB.PIECE_CHARACTERS
+      : col.keys.map(LB.getCharacter).filter(Boolean);
+
+    if (!list.length) {
+      var empty = document.createElement('p');
+      empty.className = 'char-empty';
+      empty.textContent = 'To Be Continued…';
+      box.appendChild(empty);
+      return;
+    }
+
+    var grid = document.createElement('div');
+    grid.className = 'char-grid';
+    list.forEach(function (ch) {
+      var fig = document.createElement('figure');
+      fig.className = 'char-card';
+      var im = document.createElement('img');
+      im.src = ch.src;
+      im.alt = ch.name;
+      im.loading = 'lazy';
+      var cap = document.createElement('figcaption');
+      cap.textContent = ch.name;
+      fig.appendChild(im);
+      fig.appendChild(cap);
+      grid.appendChild(fig);
+    });
+    box.appendChild(grid);
+  }
+
+  function initCharacters() {
+    if (!dom.charCollection || !dom.charGallery) return;
+    renderCharGallery(dom.charCollection.value);
+    dom.charCollection.addEventListener('change', function () {
+      renderCharGallery(this.value);
+    });
+  }
+
   /** 各枠の開閉状態を覚えておく */
   function initPanelToggles() {
     var saved = loadPref(PANEL_OPEN_KEY, {}) || {};
@@ -471,6 +536,8 @@
       board: $('board'),
       turn: $('turn'),
       turnText: $('turn-text'),
+      charCollection: $('char-collection'),
+      charGallery: $('char-gallery'),
       hint: $('hint'),
       log: $('log'),
       pass: $('pass'),
@@ -534,6 +601,7 @@
 
     initPanelSide();
     initPieceArt();
+    initCharacters();
     initPanelToggles();
     initReplay();
     initOnline();

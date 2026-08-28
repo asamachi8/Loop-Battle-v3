@@ -18,16 +18,16 @@ window.LB = window.LB || {};
   //   MARK_SEL_R   … 選択中の騎を囲む破線リングの半径
   //   MARK_CHARGE_R… ループ突撃できる敵を囲むリングの半径
   // 交点の間隔は70ユニットなので、半径35を超えると隣の駒と重なる。
-  var PIECE_ART_R = 27;
-  var PIECE_RING_R = 25.0;
-  var PIECE_RING = 2.6;
-  var PIECE_R = 26;
-  var MARK_SEL_R = 31;
-  var MARK_CHARGE_R = 33;
-  var ENTRY_R = 28;      // ループ入口の輪。選択リングと重ならない位置に置く
+  var PIECE_ART_R = 32;
+  var PIECE_RING_R = 29.6;
+  var PIECE_RING = 2.8;
+  var PIECE_R = 31;
+  var MARK_SEL_R = 33;
+  var MARK_CHARGE_R = 34.5;
+  var ENTRY_R = 28;      // ループ入口の輪。駒より内側なので、駒が乗ると隠れる
 
-  // HPの絵筆バッジ。駒の右下に斜めに置く
-  var HP_BADGE = { x: 14, y: 14, angle: -28 };
+  // HPの絵筆バッジ。駒の右下に斜めに置く。斜めなので隣の交点とはぶつからない
+  var HP_BADGE = { x: 18, y: 18, angle: -28, scale: 1.3 };
   // 絵筆のひと塗り（左右に細り、縁が不揃い）
   var BRUSH_D = 'M -9.4 -0.6 C -7.6 -3.7 -4.2 -4.9 -0.4 -4.5'
               + ' C 3.4 -4.1 7.3 -3.5 9.5 -1.8 C 10.4 -1.1 10.0 0.7 8.6 2.0'
@@ -36,6 +36,13 @@ window.LB = window.LB || {};
   // 塗り重ねの明るいスジ（筆の毛の跡）
   var BRUSH_HL_D = 'M -7.2 -1.9 C -4.4 -3.3 0.6 -3.5 5.6 -2.5'
                  + ' C 3.0 -1.2 -3.4 -0.6 -7.2 -1.9 Z';
+  // かすれ（毛の間が抜けた線）。細い線を数本引いて、絵の具のムラに見せる
+  var BRUSH_STREAKS = [
+    'M -8.2 -2.2 C -4.6 -3.4 1.2 -3.6 7.4 -2.6',
+    'M -7.6 0.4 C -3.0 -0.4 3.2 -0.6 8.8 0.2',
+    'M -6.4 2.6 C -2.2 3.4 2.6 3.6 6.8 2.4',
+    'M -2.8 -3.6 C -1.6 -1.0 -1.2 1.8 -2.0 4.2'
+  ];
 
   function svgEl(tag, attrs) {
     var e = document.createElementNS(SVG_NS, tag);
@@ -85,6 +92,20 @@ window.LB = window.LB || {};
     });
     blur.appendChild(svgEl('feGaussianBlur', { stdDeviation: 1.2 }));
     defs.appendChild(blur);
+
+    // HPの絵筆バッジの輪郭をガサガサにするフィルタ。
+    // ノイズ（feTurbulence）で画素をずらし、絵の具がかすれた縁に見せる。
+    var rough = svgEl('filter', {
+      id: 'lb-brush-rough', x: '-45%', y: '-70%', width: '190%', height: '240%'
+    });
+    rough.appendChild(svgEl('feTurbulence', {
+      type: 'fractalNoise', baseFrequency: '0.5', numOctaves: 3, seed: 11, result: 'lbNoise'
+    }));
+    rough.appendChild(svgEl('feDisplacementMap', {
+      'in': 'SourceGraphic', in2: 'lbNoise', scale: 2.4,
+      xChannelSelector: 'R', yChannelSelector: 'G'
+    }));
+    defs.appendChild(rough);
     svg.appendChild(defs);
 
     var gStatic = svgEl('g', { 'class': 'layer-static' });
@@ -557,14 +578,18 @@ window.LB = window.LB || {};
       var brush = svgEl('g', {
         'class': 'piece-hp-brush',
         transform: 'translate(' + bx + ',' + by + ') rotate(' + HP_BADGE.angle + ')'
+                 + ' scale(' + HP_BADGE.scale + ')'
       });
       brush.appendChild(svgEl('path', { d: BRUSH_D, 'class': 'brush-body' }));
       brush.appendChild(svgEl('path', { d: BRUSH_HL_D, 'class': 'brush-highlight' }));
+      BRUSH_STREAKS.forEach(function (d) {
+        brush.appendChild(svgEl('path', { d: d, 'class': 'brush-streak' }));
+      });
       g.appendChild(brush);
-      var hp = svgEl('text', { x: bx, y: by + 3.9, 'class': 'piece-hp' });
+      var hp = svgEl('text', { x: bx, y: by + 5.2, 'class': 'piece-hp' });
       hp.textContent = k.hp;
       g.appendChild(hp);
-      var lb = svgEl('text', { x: p.x, y: p.y + 38, 'class': 'piece-label' });
+      var lb = svgEl('text', { x: p.x, y: p.y + 37.5, 'class': 'piece-label' });
       lb.textContent = k.label;
       g.appendChild(lb);
       self.layers.pieces.appendChild(g);

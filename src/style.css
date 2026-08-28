@@ -305,20 +305,27 @@ body {
 .piece-p1 .piece-ring { stroke: var(--p1); }
 .piece-p2 .piece-ring { stroke: var(--p2); }
 
-/* HPは駒の右下。絵筆で斜めにひと塗りした上に数字を置く */
-.piece-hp-brush { pointer-events: none; }
+/* HPは駒の右下。絵筆で斜めにひと塗りした上に数字を置く。
+   輪郭は feTurbulence でずらして、絵の具がかすれた縁に見せている。 */
+.piece-hp-brush { pointer-events: none; filter: url(#lb-brush-rough); }
 .brush-body { stroke: rgba(24, 14, 6, .55); stroke-width: .7; }
 .piece-p1 .brush-body { fill: var(--p1); }
 .piece-p2 .brush-body { fill: var(--p2); }
-.brush-highlight { fill: #fff6e2; opacity: .22; stroke: none; }
+.brush-highlight { fill: #fff6e2; opacity: .2; stroke: none; }
+/* 毛の間が抜けたスジ。塗りの上に薄く重ねてムラを出す */
+.brush-streak {
+  fill: none; stroke: rgba(255, 246, 226, .3); stroke-width: .55;
+  stroke-linecap: round; stroke-dasharray: 2.6 1.5;
+}
 .piece-hp {
-  text-anchor: middle; font-size: 11.5px; font-weight: 700;
+  text-anchor: middle; font-size: 15px; font-weight: 700;
   font-family: var(--font-serif);
   fill: #fff6e2; pointer-events: none;
-  paint-order: stroke; stroke: rgba(24, 14, 6, .45); stroke-width: 1.6;
+  paint-order: stroke; stroke: rgba(24, 14, 6, .6); stroke-width: 2.2;
 }
 .piece-label {
-  text-anchor: middle; font-size: 12px; fill: var(--muted); pointer-events: none;
+  text-anchor: middle; font-size: 11px; fill: var(--muted); pointer-events: none;
+  paint-order: stroke; stroke: rgba(20, 13, 6, .75); stroke-width: 2;
   font-family: var(--font-serif);
 }
 
@@ -451,6 +458,39 @@ summary.card-title { cursor: pointer; }
 #roster-p2 .hp-pip.on {
   background: linear-gradient(180deg, #dd9086, var(--p2));
   box-shadow: 0 0 6px rgba(176, 67, 56, .55);
+}
+
+/* ---- キャラクター紹介 -------------------------------------------------- */
+.char-note {
+  color: var(--muted); font-size: 12px; line-height: 1.6;
+  margin: 8px 2px 10px;
+}
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 12px;
+}
+.char-card {
+  margin: 0; text-align: center;
+  background: linear-gradient(180deg, rgba(60, 46, 31, .55), rgba(30, 22, 14, .55));
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 8px 6px 7px;
+  box-shadow: inset 0 1px 0 rgba(243, 223, 162, .1);
+}
+.char-card img {
+  display: block; width: 100%; height: auto; max-width: 132px;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, .6));
+}
+.char-card figcaption {
+  font-family: var(--font-serif); font-size: 12px; line-height: 1.4;
+  color: var(--gold-lit); letter-spacing: .02em;
+}
+.char-empty {
+  color: var(--gold); font-family: var(--font-serif);
+  font-size: 15px; letter-spacing: .08em; text-align: center;
+  padding: 26px 0; margin: 0;
+  border: 1px dashed var(--line); border-radius: 2px;
 }
 
 /* ログ */
