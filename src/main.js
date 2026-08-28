@@ -398,9 +398,8 @@
     note.textContent = col.note;
     box.appendChild(note);
 
-    var list = col.keys === null
-      ? LB.PIECE_CHARACTERS
-      : col.keys.map(LB.getCharacter).filter(Boolean);
+    var all = LB.PIECE_CHARACTERS || [];
+    var list = col.keys === null ? all : col.keys.map(LB.getCharacter).filter(Boolean);
 
     if (!list.length) {
       var empty = document.createElement('p');
@@ -418,7 +417,11 @@
       var im = document.createElement('img');
       im.src = ch.src;
       im.alt = ch.name;
-      im.loading = 'lazy';
+      // 読み込めなかったら枠ごと畳んで、名前だけ残す（原因が分かるようにする）
+      im.addEventListener('error', function () {
+        fig.classList.add('char-card-missing');
+        im.remove();
+      });
       var cap = document.createElement('figcaption');
       cap.textContent = ch.name;
       fig.appendChild(im);
@@ -429,7 +432,10 @@
   }
 
   function initCharacters() {
-    if (!dom.charCollection || !dom.charGallery) return;
+    if (!dom.charCollection || !dom.charGallery) {
+      if (window.console) console.warn('[Loop Battle] キャラクター紹介の枠が見つかりません');
+      return;
+    }
     renderCharGallery(dom.charCollection.value);
     dom.charCollection.addEventListener('change', function () {
       renderCharGallery(this.value);
@@ -599,12 +605,22 @@
     dom.debugFields = [dom.maxHp, dom.normalDamage, dom.loopDamage, dom.knockback,
       dom.wallDamage, dom.boardType, dom.loopEntry, dom.chain, dom.placeP1, dom.placeP2];
 
-    initPanelSide();
-    initPieceArt();
-    initCharacters();
-    initPanelToggles();
-    initReplay();
-    initOnline();
+    // 初期化は1つずつ独立させる。どれかが失敗しても残りは動くようにするため。
+    // （以前、駒の絵柄の初期化が失敗するとキャラクター紹介まで動かなくなった）
+    [['パネルの左右', initPanelSide],
+     ['駒の絵柄', initPieceArt],
+     ['キャラクター紹介', initCharacters],
+     ['枠の開閉', initPanelToggles],
+     ['リプレイ', initReplay],
+     ['オンライン対戦', initOnline]
+    ].forEach(function (pair) {
+      try {
+        pair[1]();
+      } catch (e) {
+        // 画面は動かしたまま、どこで失敗したかをコンソールに残す
+        if (window.console) console.error('[Loop Battle] ' + pair[0] + 'の初期化に失敗:', e);
+      }
+    });
 
     LB.app = { game: game, ui: ui, online: function () { return online; } };
 

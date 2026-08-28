@@ -26,6 +26,14 @@ window.LB = window.LB || {};
   var MARK_CHARGE_R = 34.5;
   var ENTRY_R = 28;      // ループ入口の輪。駒より内側なので、駒が乗ると隠れる
 
+  // ループ突撃のきらきら。1粒の形（4方向にとがった星）と、散らばりの範囲・時間。
+  var SPARKLE_D = 'M 0 -6.5 C 0.9 -2.4 2.4 -0.9 6.5 0 C 2.4 0.9 0.9 2.4 0 6.5'
+                + ' C -0.9 2.4 -2.4 0.9 -6.5 0 C -2.4 -0.9 -0.9 -2.4 0 -6.5 Z';
+  var SPARKLE_COUNT = 14;
+  var SPARKLE_MIN_R = 34;   // 駒（半径29.1）の外から散り始める
+  var SPARKLE_MAX_R = 58;
+  var SPARKLE_MS = 1500;    // 1.5秒（CSS の fx-sparkle と合わせること）
+
   // HPの絵筆バッジ。駒の右下に斜めに置く。斜めなので隣の交点とはぶつからない
   var HP_BADGE = { x: 18, y: 18, angle: -28, scale: 1.3 };
   // 絵筆のひと塗り（左右に細り、縁が不揃い）
@@ -297,6 +305,13 @@ window.LB = window.LB || {};
       if (ev.type === 'damage') {
         var cls = ev.mode === 'loop' ? 'fx-loop' : ev.mode === 'wall' ? 'fx-wall' : 'fx-normal';
         self.floatText(ev.r, ev.c, '-' + ev.amount, cls, delay);
+        // ループを通った突撃のときだけ、撃たれた側の陣営の色できらきらを散らす
+        if (ev.mode === 'loop') {
+          var hit = self.game.state.knights.filter(function (k) {
+            return k.id === ev.knightId;
+          })[0];
+          if (hit) self.sparkleBurst(ev.r, ev.c, hit.owner, delay);
+        }
         delay += 120;
       } else if (ev.type === 'wall') {
         self.floatText(ev.r, ev.c, 'WALL', 'fx-wall', delay);
@@ -309,6 +324,35 @@ window.LB = window.LB || {};
         delay += 120;
       }
     });
+  };
+
+  // ループ突撃で撃たれた駒のまわりに、その陣営の色のきらきらを散らす。
+  // 1.5秒かけて外へ広がりながら消える。CSS変数で1粒ずつ向き・距離・回転を変えている。
+  UI.prototype.sparkleBurst = function (r, c, owner, delay) {
+    var self = this;
+    setTimeout(function () {
+      var p = self.game.board.pointXY(r, c);
+      var g = svgEl('g', {
+        'class': 'fx-sparkles fx-sparkles-' + owner,
+        transform: 'translate(' + p.x + ',' + p.y + ')'
+      });
+      for (var i = 0; i < SPARKLE_COUNT; i++) {
+        // 均等に散らしたうえで少しだけ角度と距離を揺らす
+        var ang = (Math.PI * 2 * i) / SPARKLE_COUNT + (Math.random() - 0.5) * 0.6;
+        var dist = SPARKLE_MIN_R + Math.random() * (SPARKLE_MAX_R - SPARKLE_MIN_R);
+        var s = svgEl('path', { d: SPARKLE_D, 'class': 'sparkle' });
+        s.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        s.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        s.style.setProperty('--rot', Math.round((Math.random() - 0.5) * 360) + 'deg');
+        s.style.setProperty('--scale', (0.55 + Math.random() * 0.75).toFixed(2));
+        s.style.setProperty('--delay', (Math.random() * 0.28).toFixed(2) + 's');
+        g.appendChild(s);
+      }
+      self.layers.fx.appendChild(g);
+      setTimeout(function () {
+        if (g.parentNode) g.parentNode.removeChild(g);
+      }, SPARKLE_MS + 400);
+    }, delay || 0);
   };
 
   UI.prototype.floatText = function (r, c, text, cls, delay) {

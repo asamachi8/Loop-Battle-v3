@@ -361,6 +361,41 @@ body {
 .fx-wall   { fill: #e8a05a; font-size: 24px; }
 .fx-ko     { fill: #fff6e2; font-size: 30px; }
 
+/* ループ突撃で撃たれた駒のまわりに散るきらきら。
+   撃たれた側の陣営の色。1粒ずつ向き・距離・回転・遅れを CSS変数で変えている。
+   時間は src/ui.js の SPARKLE_MS（1500ms）と合わせること。 */
+.fx-sparkles { pointer-events: none; }
+.sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: fx-sparkle 1.5s cubic-bezier(.18, .7, .3, 1) forwards;
+  animation-delay: var(--delay, 0s);
+}
+.fx-sparkles-p1 .sparkle { fill: #b9d2f0; }
+.fx-sparkles-p2 .sparkle { fill: #f3b3a8; }
+/* 半分は陣営の色そのままにして、明るい粒と混ぜる */
+.fx-sparkles-p1 .sparkle:nth-child(2n) { fill: var(--p1); }
+.fx-sparkles-p2 .sparkle:nth-child(2n) { fill: var(--p2); }
+
+@keyframes fx-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(.15) rotate(0deg);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * .3), calc(var(--dy) * .3))
+               scale(var(--scale, 1)) rotate(calc(var(--rot, 0deg) * .3));
+  }
+  65% { opacity: .95; }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy))
+               scale(calc(var(--scale, 1) * .35)) rotate(var(--rot, 0deg));
+  }
+}
+
 @keyframes fx-rise {
   0%   { opacity: 0; transform: translateY(6px); }
   20%  { opacity: 1; transform: translateY(0); }
@@ -486,6 +521,12 @@ summary.card-title { cursor: pointer; }
   font-family: var(--font-serif); font-size: 12px; line-height: 1.4;
   color: var(--gold-lit); letter-spacing: .02em;
 }
+/* 画像が読めなかったカード。名前だけ残して、欠けていることが分かるようにする */
+.char-card-missing {
+  min-height: 84px; display: flex; align-items: center; justify-content: center;
+  border-style: dashed;
+}
+.char-card-missing figcaption { color: var(--muted); }
 .char-empty {
   color: var(--gold); font-family: var(--font-serif);
   font-size: 15px; letter-spacing: .08em; text-align: center;
