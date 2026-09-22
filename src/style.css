@@ -1,5 +1,5 @@
 /* =========================================================================
- * style.css — Ver.0.4 バロック調の見た目
+ * style.css — Ver.0.5 バロック調の見た目
  *
  * 参考画像（assets/reference/）の雰囲気に合わせる：
  *   蝋燭に照らされた薄暗い展示室の壁に、金の額縁に入った絵画が掛かっていて、
@@ -75,10 +75,15 @@ body {
   color: var(--gold-lit);
   text-shadow: 0 1px 0 rgba(0, 0, 0, .8), 0 0 26px rgba(255, 190, 110, .28);
 }
+/* タイトル横のバージョン数。目立たせないよう薄く小さく */
 .app-header .ver {
   font-size: 12px; letter-spacing: .12em; color: var(--muted);
+  opacity: .55; font-weight: 400;
   margin-left: 10px; vertical-align: middle;
 }
+
+/* 開発者向けの注記。プレイヤーには見せず、URL に ?dev=1 を付けたときだけ出す */
+body:not(.dev-mode) .dev-only { display: none !important; }
 .app-header .sub {
   margin: 8px auto 0;
   color: var(--muted);
@@ -192,6 +197,13 @@ body {
   color: var(--gold); font-size: 12px; margin: 10px 2px 0;
   font-family: var(--font-serif); letter-spacing: .05em;
 }
+/* 危ないマスの状況（有効なときだけ出す） */
+.zone-info {
+  color: #e9a08f; font-size: 12px; margin: 4px 2px 0;
+  font-family: var(--font-serif); letter-spacing: .05em;
+}
+.zone-info.is-active { color: #ff8a7a; font-weight: bold; }
+.zone-info[hidden] { display: none; }
 
 /* ---- 手番表示の中身（色駒アイコンとプレイヤー名）------------------------
    もとは盤面の左に縦の銘板として置いていたが、Ver.0.4 で手番の帯へまとめた。 */
@@ -215,9 +227,16 @@ body {
 .turn-side-name { font-family: var(--font-serif); font-size: 17px; letter-spacing: .06em; }
 .turn-side-who { font-size: 12.5px; color: var(--muted); }
 .turn-side-count {
-  font-size: 12px; color: var(--muted); margin-left: auto; padding-left: 12px;
+  font-size: 12px; color: var(--muted); padding-left: 14px;
   font-family: var(--font-serif); letter-spacing: .08em; white-space: nowrap;
 }
+/* 考える時間の残り秒数。5秒以下で赤く点滅 */
+.turn-timer {
+  font-size: 13px; color: var(--gold-lit); padding-left: 10px;
+  font-family: var(--font-serif); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.turn-timer.is-low { color: #ff7a66; animation: zone-pulse .8s ease-in-out infinite; }
+.turn-timer[hidden] { display: none; }
 .turn-side-p1 .turn-side-dot { background: radial-gradient(circle at 34% 30%, #7ba0d0, var(--p1) 62%, #24405f); }
 .turn-side-p1 .turn-side-name { color: #9dbde3; }
 .turn-side-p2 .turn-side-dot { background: radial-gradient(circle at 34% 30%, #dd8a7c, var(--p2) 62%, #5d201b); }
@@ -233,6 +252,26 @@ body {
 .turn-side-mine .turn-side-who { color: var(--move); font-weight: 700; }
 /* ---- ボタン（真鍮の小札）---------------------------------------------- */
 .board-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.npc-row { margin-top: 8px; }
+.board-actions:empty { display: none; }
+
+/* 手番の帯の右端に置く操作ボタン。1段目：座標を隠す／RESTART／降参する、
+   2段目：RESTART と降参の下にBGMの音量スライダー */
+.turn-actions {
+  display: grid; grid-template-columns: auto auto auto; gap: 6px;
+  justify-content: end; align-items: center;
+  margin-left: auto; flex: 0 0 auto;
+}
+.turn-actions .btn { letter-spacing: .04em; }
+.turn-bgm {
+  grid-column: 2 / 4; grid-row: 2;
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-serif); font-size: 12px; color: var(--gold-lit);
+}
+.turn-bgm-label { white-space: nowrap; letter-spacing: .04em; }
+.turn-bgm input[type=range] { flex: 1 1 auto; min-width: 60px; width: 100%; accent-color: var(--gold); cursor: pointer; }
+.turn-bgm-value { min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; }
+.turn-bgm.is-off .turn-bgm-label, .turn-bgm.is-off .turn-bgm-value { opacity: .55; }
 
 .btn {
   font-family: var(--font-serif);
@@ -360,6 +399,90 @@ body {
 .fx-push   { fill: #9ccbb4; font-size: 22px; }
 .fx-wall   { fill: #e8a05a; font-size: 24px; }
 .fx-ko     { fill: #fff6e2; font-size: 30px; }
+.fx-zone   { fill: #ff8a7a; font-size: 24px; }
+
+/* 危ないマス（外周）。始まる10手前は点線で予告し、始まったら赤く塗る */
+.zone-cell { pointer-events: none; }
+.zone-warn { fill: none; stroke: rgba(224, 96, 80, .55); stroke-width: 2; stroke-dasharray: 5 5; animation: zone-pulse 1.6s ease-in-out infinite; }
+.zone-active { fill: rgba(190, 50, 40, .22); stroke: rgba(230, 90, 70, .55); stroke-width: 1.5; }
+@keyframes zone-pulse { 50% { opacity: .35; } }
+
+/* ---- バトル開始の関門（NPC対戦・オンライン対戦）------------------------
+   盤面を少し暗くし、真ん中に「バトル開始」ボタンを置く。 */
+.battle-gate {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 6, 2, .35) 0%, rgba(10, 6, 2, .62) 100%);
+  animation: gate-in .35s ease-out;
+}
+.battle-gate[hidden] { display: none; }
+.battle-gate-box { text-align: center; padding: 0 12px; }
+.gate-button {
+  font-family: var(--font-serif);
+  font-size: clamp(15px, 3.4vw, 22px);
+  letter-spacing: .24em;
+  padding: .7em 1.8em .7em 2em;
+  box-shadow: 0 0 0 1px rgba(243, 223, 162, .35), 0 8px 26px rgba(0, 0, 0, .6),
+              0 0 32px rgba(255, 196, 110, .28);
+  animation: gate-pulse 2.2s ease-in-out infinite;
+}
+.gate-button:disabled { animation: none; opacity: .85; cursor: default; }
+.gate-info {
+  white-space: pre-line;   /* 抽選の案内を2行目に出す */
+  margin: 12px 0 0; min-height: 1.4em;
+  color: var(--gold-lit); font-family: var(--font-serif);
+  font-size: 13px; letter-spacing: .08em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+@keyframes gate-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gate-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+
+/* ---- 「ＢＡＴＴＬＥ　ＳＴＡＲＴ」の演出 ---------------------------------
+   時間は src/ui.js の BATTLE_START_MS（1800ms）と合わせること。
+   文字の大きさは盤面の幅に合わせる（cqi = この枠の幅の1%）。 */
+.battle-start {
+  position: absolute; inset: 0; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0;
+  container-type: inline-size;
+}
+.battle-start-text {
+  font-family: var(--font-serif); font-weight: 700;
+  font-size: 30px;              /* コンテナクエリ非対応ブラウザ向け */
+  font-size: 6.4cqi;
+  letter-spacing: .04em; white-space: nowrap;
+  color: #fff3cf;
+  text-shadow: 0 0 6px rgba(255, 214, 140, .95), 0 0 22px rgba(255, 170, 70, .75),
+               0 3px 0 #6d5119, 0 6px 14px rgba(0, 0, 0, .8);
+}
+.battle-start::before {        /* 文字の背後を横切る光の帯 */
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  height: 26%; transform: translateY(-50%) scaleX(0);
+  background: linear-gradient(90deg, transparent, rgba(255, 210, 130, .35) 20%,
+              rgba(255, 240, 200, .55) 50%, rgba(255, 210, 130, .35) 80%, transparent);
+  border-top: 1px solid rgba(255, 230, 170, .6);
+  border-bottom: 1px solid rgba(255, 230, 170, .6);
+}
+.battle-start.is-playing { animation: bs-fade 1.8s ease-out forwards; }
+.battle-start.is-playing::before { animation: bs-band 1.8s cubic-bezier(.2, .8, .2, 1) forwards; }
+.battle-start.is-playing .battle-start-text { animation: bs-text 1.8s cubic-bezier(.2, .8, .2, 1) forwards; }
+@keyframes bs-fade {
+  0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; }
+}
+@keyframes bs-band {
+  0% { transform: translateY(-50%) scaleX(0); }
+  22% { transform: translateY(-50%) scaleX(1); }
+  100% { transform: translateY(-50%) scaleX(1.05); }
+}
+@keyframes bs-text {
+  0%   { transform: scale(1.9); filter: blur(6px); letter-spacing: .5em; }
+  24%  { transform: scale(1);   filter: blur(0);   letter-spacing: .04em; }
+  78%  { transform: scale(1.03); filter: blur(0); }
+  100% { transform: scale(1.08); filter: blur(2px); }
+}
 
 /* ループ突撃で撃たれた駒のまわりに散るきらきら。
    撃たれた側の陣営の色。1粒ずつ向き・距離・回転・遅れを CSS変数で変えている。
@@ -608,8 +731,8 @@ summary.card-title { cursor: pointer; }
 .online-share { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
 .online-share .btn { text-decoration: none; display: inline-block; }
 
-.side-choice { margin: 4px 0 10px; }
-.side-choice-buttons { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+/* 先攻・後攻ボタン（デバッグ設定の表の中に置く） */
+.side-choice-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .side-btn.is-active {
   background: linear-gradient(180deg, #6d5119 0%, #3d2c0d 100%);
   border-color: var(--gold); color: #fff6dd;
@@ -650,6 +773,11 @@ summary.card-title { cursor: pointer; }
   .app { padding: 8px 12px 32px; }
   .app-header h1 { font-size: 23px; }
 }
+@media (max-width: 480px) {
+  /* 狭い画面では字間を詰めてタイトルを1行に収める */
+  .app-header h1 { font-size: 19px; letter-spacing: .06em; }
+  .app-header .ver { margin-left: 6px; font-size: 11px; }
+}
 
 @media (max-width: 760px) {
   .app { padding: 6px 5px 28px; gap: 14px; }
@@ -663,9 +791,16 @@ summary.card-title { cursor: pointer; }
     --fw: calc(100vw - 10px);
     margin: 0 auto;
   }
-  .turn { font-size: 15px; padding: 8px 12px; gap: 10px; }
+  .turn { font-size: 15px; padding: 8px 12px; gap: 8px 10px; flex-wrap: wrap; }
+  /* 狭い画面ではボタンを2段目に回し、横いっぱいに並べる */
+  .turn-actions { margin-left: 0; width: 100%; justify-content: center; }
   .turn-side-name { font-size: 15px; }
   .turn-side-label { letter-spacing: .18em; }
   .board-actions { justify-content: center; }
-  .hint, .board-name { text-align: center; }
+  .hint, .board-name, .zone-info { text-align: center; }
+}
+/* スマホ幅：手番の帯のボタンを詰めて並べる */
+@media (max-width: 480px) {
+  .turn-actions { gap: 4px 5px; }
+  .turn-actions .btn { padding: 5px 8px; font-size: 12px; letter-spacing: 0; white-space: nowrap; }
 }

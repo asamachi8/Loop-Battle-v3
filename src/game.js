@@ -18,7 +18,7 @@ window.LB = window.LB || {};
     this.applyConfig(config);
   }
 
-  /** 設定を差し替えて初期化し直す（デバッグ設定の適用用） */
+  /** 設定を差し替えて初期化し直す（対戦設定の適用用） */
   Game.prototype.applyConfig = function (config) {
     this.config = LB.cloneConfig(config);
     this.boardType = LB.getBoardType(this.config.BOARD_TYPE);
@@ -62,7 +62,12 @@ window.LB = window.LB || {};
       knights: knights,
       currentPlayer: 'p1',
       turnCount: 1,
-      winner: null
+      winner: null,
+      // NPC対戦・オンライン対戦では「バトル開始」を押すまで始まらない。
+      // round は対局ごとに変わる番号で、オンラインの「準備完了」がどの対局に
+      // 対するものかを見分けるのに使う。
+      started: false,
+      round: Date.now() * 1000 + Math.floor(Math.random() * 1000)   // 同じミリ秒でも重ならないように
     };
     this.log = [];
     this.frames = [];
@@ -140,9 +145,13 @@ window.LB = window.LB || {};
 
   Game.prototype.pass = function () {
     this.pushLog(PLAYER_LABEL[this.state.currentPlayer] + ' は行動できる手が無いためパスしました。', 'warn');
+    // パスも1手なので、危ないマスの数は進む
+    var events = [];
+    rules.applyDangerZone(this.state, this.board, this.config, this.state.currentPlayer, events);
+    this.logEvents(events, 'pass');
     this.endTurn();
     this.recordFrame();
-    return [];
+    return events;
   };
 
   Game.prototype.logEvents = function (events, kind) {
@@ -160,6 +169,7 @@ window.LB = window.LB || {};
       } else if (ev.type === 'damage') {
         var label = ev.mode === 'loop' ? 'ループ突撃'
                   : ev.mode === 'wall' ? '壁激突'
+                  : ev.mode === 'zone' ? '危ないマス'
                   : '通常接近攻撃';
         self.pushLog(self.knightName(ev.knightId) + ' に ' + label + ' -' + ev.amount
           + '（残りHP ' + ev.hp + '）', ev.mode === 'loop' ? 'loop' : 'hit');
@@ -171,6 +181,11 @@ window.LB = window.LB || {};
           + (ev.chained ? '巻き込まれて押し出された。' : 'ノックバック。'), 'push');
       } else if (ev.type === 'ko') {
         self.pushLog('KO! ' + self.knightName(ev.knightId) + ' 撃破。', 'ko');
+      } else if (ev.type === 'zone-start') {
+        self.pushLog('⚠ 外周が「危ないマス」になりました。自分の手番' + self.config.DANGER_ZONE_INTERVAL
+          + '回ごとに、そこにいる自分の騎が -' + (self.config.DANGER_ZONE_DAMAGE || 1) + '。', 'warn');
+      } else if (ev.type === 'timeout') {
+        self.pushLog('⏱ ' + PLAYER_LABEL[ev.player] + ' は時間切れ。ランダムに1手指しました。', 'warn');
       }
     });
   };

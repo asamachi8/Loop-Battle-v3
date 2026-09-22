@@ -1,6 +1,16 @@
-MIT License
+LOOP BATTLE Simulator
+Copyright (c) 2026 asamachi
 
-Copyright (c) 2026 <asamachi>
+This project contains two kinds of material with different terms:
+(1) the source code, which is licensed under the MIT License below, and
+(2) the artwork and music assets, which are NOT covered by the MIT License.
+
+==============================================================================
+1. Source code — MIT License
+==============================================================================
+
+Applies to: index.html, manifest.webmanifest, src/*.js, src/style.css,
+and the documentation in docs/ and README.md.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +29,35 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+==============================================================================
+2. Artwork and music — All rights reserved (NOT MIT)
+==============================================================================
+
+Applies to everything under assets/, including:
+  - assets/pieces/  character images used for the pieces
+  - assets/bgm/     the three battle music tracks
+  - assets/board/   the picture frame images
+  - assets/icons/   the application icons
+
+Copyright (c) 2026 asamachi. All rights reserved.
+These files are provided only so that this game can be played in a web
+browser. You may NOT copy, redistribute, re-upload, modify, or use them in
+any other work without prior written permission from the copyright holder.
+
+==============================================================================
+3. Third-party software
+==============================================================================
+
+src/vendor/peerjs.min.js — PeerJS, licensed under the MIT License by its
+authors (https://github.com/peers/peerjs).
+
+------------------------------------------------------------------------------
+【日本語での説明】
+
+・ソースコード（index.html、manifest.webmanifest、src/ の JavaScript と CSS、
+  docs/ と README.md の文書）は MIT ライセンスです。条件を守れば自由に使えます。
+・assets/ の中の素材（駒のキャラクター画像、戦闘BGM 3曲、額縁の画像、アイコン）は
+  MIT ライセンスの対象外です。著作権は asamachi にあり、このゲームを遊ぶためだけに
+  公開しています。無断での複製・再配布・転載・改変・他の作品での使用はできません。
+・src/vendor/peerjs.min.js は PeerJS のライセンス（MIT）に従います。

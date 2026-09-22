@@ -1,6 +1,6 @@
 /* =========================================================================
  * main.js
- * 起動処理と、画面上のデバッグ設定パネル（仕様書 §23）・RESTART（§24）。
+ * 起動処理と、画面上の対戦設定パネル（仕様書 §23）・RESTART（§24）。
  * ========================================================================= */
 (function (LB) {
   'use strict';
@@ -62,6 +62,8 @@
     dom.boardType.value = String(config.BOARD_TYPE);
     dom.loopEntry.value = config.LOOP_ENTRY_MAX_STEPS;
     dom.chain.checked = !!config.CHAIN_KNOCKBACK;
+    dom.danger.checked = !!config.DANGER_ZONE;
+    dom.think.checked = (config.THINK_TIME || 0) > 0;
     dom.placeP1.value = formatPlacement(config.INITIAL_PLACEMENT.p1);
     dom.placeP2.value = formatPlacement(config.INITIAL_PLACEMENT.p2);
     dom.debugError.textContent = '';
@@ -81,6 +83,8 @@
     cfg.WALL_DAMAGE = num(dom.wallDamage, '壁激突ダメージ', 0);
     cfg.LOOP_ENTRY_MAX_STEPS = num(dom.loopEntry, 'ループ入口までの歩数', 1);
     cfg.CHAIN_KNOCKBACK = dom.chain.checked;
+    cfg.DANGER_ZONE = dom.danger.checked;
+    cfg.THINK_TIME = dom.think.checked ? (LB.DEFAULT_CONFIG.THINK_TIME || 20) : 0;
 
     cfg.BOARD_TYPE = num(dom.boardType, '盤面の種類', 1);
     var size = cfg.BOARD_SIZE;
@@ -120,6 +124,198 @@
 
   function isOnline() { return !!(online && online.session && online.session.connected); }
 
+  // ---- 対戦モード：ローカル（同じPCで2人）／NPC対戦／オンライン対戦 ------
+  // NPC対戦中は { human: 自分の側, cpu: NPCの側 }。それ以外は null。
+  var npc = null;
+  var NPC_DELAY_MS = 750;   // NPCが指すまでの間（相手の手の演出を見せるため）
+
+  function sideLabel(p) { return p === 'p1' ? 'Player 1（青・先攻）' : 'Player 2（赤・後攻）'; }
+
+  /**
+   * 描画のたびに呼ぶ。今のモードに合わせて、操作できる側・開始の関門・
+   * 関門に出す一言をそろえる。
+   */
+  function syncGate() {
+    var active = isOnline();
+    ui.localPlayer = active ? online.session.localPlayer() : (npc ? npc.human : null);
+    ui.battleGate = active || !!npc;
+    ui.opponentName = (npc && !active) ? 'NPC' : null;
+    if (active) {
+      var rs = online.session.readyState();
+      ui.gateWaiting = rs.me;
+      ui.gateInfo = (rs.me
+        ? (rs.opponent ? '開始します…' : '相手の準備を待っています…')
+        : (rs.opponent ? '相手は準備完了です。' : 'お互いが押すと対局が始まります。'))
+        + (online.session.randomSide ? '\n先攻・後攻は開始時に抽選します。' : '');
+    } else if (npc) {
+      ui.gateWaiting = false;
+      ui.gateInfo = 'NPC（' + LB.NPC.LEVEL + '）と対戦します。' + (npc.choice === 'random'
+        ? '先攻・後攻は開始時に抽選します。'
+        : 'あなたは ' + sideLabel(npc.human) + ' です。');
+    } else {
+      ui.gateWaiting = false;
+      ui.gateInfo = '';
+    }
+    syncBgm();
+    syncTimer();
+  }
+
+  // ---- 考える時間（config.THINK_TIME 秒。仕様書 §36）--------------------
+  // 人が指す手番だけ数える（NPCの手番は数えない）。時間切れになったら、
+  // その手番の人の代わりにランダムな1手を指す。オンライン対戦では
+  // 手番の側のブラウザだけが指し、相手側は残り時間を表示するだけ。
+  var timer = { key: null, deadline: 0, handle: null, fired: false };
+
+  function inBattleNow() {
+    var st = game.state;
+    return !st.winner && (ui.battleGate ? !!st.started : st.turnCount > 1);
+  }
+
+  function syncTimer() {
+    var st = game.state;
+    var secs = game.config.THINK_TIME || 0;
+    var humanTurn = !(npc && !isOnline() && st.currentPlayer === npc.cpu);
+    // 「ＢＡＴＴＬＥ　ＳＴＡＲＴ」の演出中は数えず、演出が終わってから20秒を数え始める
+    var active = secs > 0 && inBattleNow() && humanTurn && !ui.isReplaying() && !ui.battleStartPlaying;
+    if (!active) {
+      timer.key = null;
+      if (timer.handle) { clearInterval(timer.handle); timer.handle = null; }
+      dom.turnTimer.hidden = true;
+      return;
+    }
+    var key = st.round + ':' + st.turnCount;
+    if (key !== timer.key) {
+      timer.key = key;
+      timer.deadline = Date.now() + secs * 1000;
+      timer.fired = false;
+    }
+    if (!timer.handle) timer.handle = setInterval(tickTimer, 200);
+    tickTimer();
+  }
+
+  function tickTimer() {
+    if (!timer.key) return;
+    if (ui.battleStartPlaying) { syncTimer(); return; }   // 演出が始まったら数え直し（終わってから20秒）
+    var left = Math.max(0, Math.ceil((timer.deadline - Date.now()) / 1000));
+    dom.turnTimer.hidden = false;
+    dom.turnTimer.textContent = '⏱ ' + left;
+    dom.turnTimer.classList.toggle('is-low', left <= 5);
+    if (left <= 0 && !timer.fired) {
+      timer.fired = true;
+      timeUp();
+    }
+  }
+
+  /** 時間切れ：手番の人の代わりにランダムな1手を指す */
+  function timeUp() {
+    var st = game.state;
+    if (!inBattleNow() || ui.isReplaying()) return;
+    var player = st.currentPlayer;
+    if (ui.localPlayer && ui.localPlayer !== player) return;   // 相手の手番は相手のブラウザが処理する
+    var actions = LB.NPC.listActions(st, game.board, game.config, player);
+    var action = actions.length ? actions[Math.floor(Math.random() * actions.length)] : { type: 'pass' };
+    game.logEvents([{ type: 'timeout', player: player }]);
+    ui.performAction(action);
+  }
+
+  // ---- 戦闘BGM（src/bgm.js）---------------------------------------------
+  var bgm = null;
+
+  /**
+   * 「戦闘中」の間だけ鳴らす。NPC・オンライン対戦は BATTLE START から、
+   * ローカル対戦は最初の1手から。勝敗が付いたら止め、RESTART で次の曲を選び直す。
+   */
+  function syncBgm() {
+    if (!bgm) return;
+    var st = game.state;
+    var inBattle = !st.winner && (ui.battleGate ? !!st.started : st.turnCount > 1);
+    bgm.sync(inBattle, st.round);
+    markBgmVolume();
+  }
+
+  /** 手番の帯の音量表示（数字・消音の見た目・流れている曲名のツールチップ）をそろえる */
+  function markBgmVolume() {
+    var v = bgm.volume;
+    $('bgm-volume-value').textContent = v === 0 ? 'OFF' : String(v);
+    var row = $('turn-bgm');
+    row.classList.toggle('is-off', v === 0);
+    var now = bgm.nowPlaying();
+    row.title = '戦闘BGMの音量（0で消音）' + (now ? '\n♪ ' + now : '');
+  }
+
+  function initBgm() {
+    bgm = new LB.BGM();
+    var sel = $('cfg-bgm');
+    LB.BGM_TRACKS.forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = t.title;
+      sel.appendChild(o);
+    });
+    sel.value = bgm.choice;
+    sel.addEventListener('change', function () { bgm.setChoice(sel.value); });
+    var vol = $('bgm-volume');
+    vol.value = bgm.volume;
+    vol.addEventListener('input', function () {
+      bgm.setVolume(vol.value);
+      markBgmVolume();
+    });
+    syncBgm();
+  }
+
+  /** NPCの番なら、少し間をおいて1手指させる */
+  function scheduleNpc() {
+    if (!npc || isOnline()) return;
+    var st = game.state;
+    if (st.winner || !st.started || st.currentPlayer !== npc.cpu) return;
+    var round = st.round, turn = st.turnCount;
+    setTimeout(function tick() {
+      var now = game.state;
+      // 待っているあいだにRESTART・設定変更・モード変更があったら取りやめる
+      if (!npc || now.round !== round || now.turnCount !== turn || now.winner) return;
+      if (ui.isReplaying()) { setTimeout(tick, 500); return; }  // リプレイを見ている間は待つ
+      ui.performAction(LB.NPC.chooseAction(game, npc.cpu));
+    }, NPC_DELAY_MS);
+  }
+
+  /** 「バトル開始」が押されたとき */
+  function pressStart() {
+    if (isOnline()) {
+      online.session.markReady();         // 両者そろったら host が開始を決める
+      return;
+    }
+    if (!npc || game.state.started) return;
+    if (npc.choice === 'random') {
+      // ランダム指定なら、ここで初めて先攻・後攻を決める
+      npc.human = Math.random() < 0.5 ? 'p1' : 'p2';
+      npc.cpu = npc.human === 'p1' ? 'p2' : 'p1';
+      game.pushLog('抽選の結果、あなたは' + (npc.human === 'p1' ? '先攻（青）' : '後攻（赤）') + 'になりました。', 'info');
+    }
+    game.state.started = true;
+    game.pushLog('バトル開始！', 'win');
+    ui.battleStartPlaying = true;          // 演出が終わるまで考える時間を数えない
+    ui.render();
+    ui.playBattleStart(scheduleNpc);      // 演出が終わってから、NPCが先攻なら指す
+  }
+
+  /** choice は 'p1' | 'p2' | 'random'。ランダムは「バトル開始」を押したときに抽選する */
+  function startNpcBattle(choice) {
+    var human = choice === 'p2' ? 'p2' : 'p1';   // ランダムのときは開始までの仮の担当
+    npc = { choice: choice, human: human, cpu: human === 'p1' ? 'p2' : 'p1' };
+    ui.selectedId = null;
+    refreshOnlineUi();
+    setOnlineStatus('NPC対戦（' + LB.NPC.LEVEL + '）の準備ができました。盤面の「バトル開始」を押してください。', 'ok');
+  }
+
+  function stopNpcBattle(silent) {
+    if (!npc) return;
+    npc = null;
+    game.reset();
+    ui.selectedId = null;
+    refreshOnlineUi();
+    if (!silent) setOnlineStatus('NPC対戦をやめました。ローカル対戦（同じPCで2人）に戻ります。', 'info');
+  }
+
   function setOnlineStatus(text, kind) {
     dom.onlineStatus.textContent = text;
     dom.onlineStatus.className = 'online-status online-' + (kind || 'info');
@@ -129,7 +325,14 @@
   function refreshOnlineUi() {
     var active = isOnline();
     var waiting = !!(online && online.peer && !active);
-    ui.localPlayer = active ? online.session.localPlayer() : null;
+    syncGate();
+
+    // NPC対戦ボタン：オンライン対戦の部屋があるあいだは押せない
+    if (dom.debugNpc) {
+      dom.debugNpc.disabled = !!(online && online.peer);
+      dom.debugNpc.textContent = npc ? 'NPC対戦をやめる' : 'この設定でNPCと対戦';
+      dom.debugNpc.classList.toggle('btn-primary', !npc);
+    }
 
     dom.onlineHost.style.display = (online && online.peer) ? 'none' : 'inline-block';
     dom.onlineLeave.style.display = (online && online.peer) ? 'inline-block' : 'none';
@@ -155,37 +358,45 @@
     // 降参できるのは対局中だけ。オンラインでは自分が参加している対局のみ
     dom.resign.disabled = !!game.state.winner;
 
-    dom.roleNote.textContent = active
-      ? 'あなたは ' + (ui.localPlayer === 'p1' ? 'Player 1（青・先攻・下側）' : 'Player 2（赤・後攻・上側）') + ' です。'
-      : '';
+    dom.roleNote.textContent = !active ? ''
+      : (online.session.randomSide && !game.state.started)
+        ? '先攻・後攻はバトル開始時に抽選します。'
+        : 'あなたは ' + (ui.localPlayer === 'p1' ? 'Player 1（青・先攻・下側）' : 'Player 2（赤・後攻・上側）') + ' です。';
     ui.render();
   }
 
-  /** 選択中の担当ボタンに印を付ける */
+  /** 選択中の担当ボタンに印を付ける（ボタンは対戦設定の中） */
   function markSideButton() {
-    var current = online ? online.hostPlayer : 'p1';
     dom.sideButtons.p1.classList.toggle('is-active', sideChoice === 'p1');
     dom.sideButtons.p2.classList.toggle('is-active', sideChoice === 'p2');
     dom.sideButtons.random.classList.toggle('is-active', sideChoice === 'random');
-    dom.sideButtons.random.textContent = (sideChoice === 'random')
-      ? 'ランダム（' + (current === 'p1' ? '先攻' : '後攻') + '）'
-      : 'ランダム';
   }
 
-  /** 先攻・後攻を決める。ランダム指定ならその場で抽選する。 */
+  /**
+   * 先攻・後攻（NPC対戦・オンライン対戦で自分が担当する側）。
+   * 対戦設定のボタンで選び、オンライン対戦では部屋主の選択が使われる。
+   * ランダムはここでは抽選せず、「バトル開始」で対局が始まるときに決める。
+   */
   var sideChoice = 'p1'; // 'p1' | 'p2' | 'random'
 
   function applySideChoice(choice) {
-    sideChoice = choice;
-    var player = choice === 'random'
-      ? (Math.random() < 0.5 ? 'p1' : 'p2')
-      : choice;
-
-    if (isOnline() && game.state.turnCount > 1 &&
+    if (isOnline() && (game.state.started || game.state.turnCount > 1) &&
         !window.confirm('先攻・後攻を変更すると対局を最初からやり直します。よろしいですか？')) {
       return;
     }
-    if (online) online.setHostPlayer(player);
+    sideChoice = choice;
+    savePref('lb.sideChoice', choice);
+    var random = choice === 'random';
+
+    if (npc && !isOnline()) {
+      startNpcBattle(choice);             // 担当を変えてNPC対戦を最初から
+      game.reset();
+      markSideButton();
+      ui.render();
+      return;
+    }
+    // ランダムのときは今の担当を仮に残し、開始時に抽選し直す
+    if (online) online.setHostPlayer(random ? online.hostPlayer : choice, random);
 
     if (isOnline()) {
       // 担当が変わったので対局を仕切り直す
@@ -193,30 +404,29 @@
       ui.selectedId = null;
       ui.render();
       online.session.pushConfig();
-      setOnlineStatus('担当を変更しました。あなたは '
-        + (online.session.localPlayer() === 'p1' ? 'Player 1（青・先攻）' : 'Player 2（赤・後攻）')
-        + ' です。対局は最初から始まります。', 'ok');
+      setOnlineStatus(random
+        ? '先攻・後攻をランダムにしました。バトル開始時に抽選します。'
+        : '担当を変更しました。あなたは ' + sideLabel(online.session.localPlayer()) + ' です。対局は最初から始まります。', 'ok');
     } else {
-      setOnlineStatus('次に作る部屋では '
-        + (player === 'p1' ? 'Player 1（青・先攻）' : 'Player 2（赤・後攻）')
-        + ' を担当します。', 'info');
+      setOnlineStatus('次のNPC対戦・オンライン対戦では '
+        + (random ? '先攻・後攻をバトル開始時に抽選します。' : sideLabel(choice) + ' を担当します。'), 'info');
     }
     refreshOnlineUi();
   }
 
   /** 対戦URLの共有リンクを更新する（すべて新しいタブで開く） */
   function updateShareLinks(url) {
-    var text = 'Loop Battle で対戦しよう！ このURLを開くと対戦が始まります。';
+    var text = 'LOOP BATTLE シミュレーターで対戦しよう！ このURLを開くと対戦が始まります。';
     var eu = encodeURIComponent(url);
     var et = encodeURIComponent(text);
     dom.shareLine.href = 'https://social-plugins.line.me/lineit/share?url=' + eu;
     dom.shareX.href = 'https://twitter.com/intent/tweet?text=' + et + '&url=' + eu;
-    dom.shareMail.href = 'mailto:?subject=' + encodeURIComponent('Loop Battle の対戦URL')
+    dom.shareMail.href = 'mailto:?subject=' + encodeURIComponent('LOOP BATTLE シミュレーターの対戦URL')
       + '&body=' + encodeURIComponent(text + '\n\n' + url);
     dom.shareNative.style.display = navigator.share ? 'inline-block' : 'none';
     dom.shareNative.onclick = function () {
       // 共有シートを開くだけでページ遷移しないので、対戦は途切れない
-      navigator.share({ title: 'Loop Battle', text: text, url: url })
+      navigator.share({ title: 'LOOP BATTLE シミュレーター', text: text, url: url })
         .catch(function () { /* ユーザーがキャンセルした場合など */ });
     };
   }
@@ -232,7 +442,9 @@
           showBoardName();
           fillDebugForm(game.config);
         }
+        if (info && info.battleStart) ui.battleStartPlaying = true;   // 演出が終わるまで考える時間を数えない
         refreshOnlineUi();
+        if (info && info.battleStart) ui.playBattleStart();
       },
       onRoom: function (roomId, url) {
         dom.onlineLinkRow.style.display = 'flex';
@@ -241,10 +453,13 @@
         refreshOnlineUi();
       }
     });
+    // 対戦設定で選んだ先攻・後攻を、これから作る部屋にも使う
+    online.setHostPlayer(sideChoice === 'p2' ? 'p2' : 'p1', sideChoice === 'random');
 
     // 1手指すたびに相手へ盤面を送る
     ui.onAction = function () {
       if (isOnline()) online.session.pushLocalMove();
+      else if (npc) scheduleNpc();         // 次がNPCの番なら指させる
     };
 
     // ① 盤面を最新に更新（通信が一瞬途切れたときの復旧用）
@@ -268,6 +483,7 @@
         setOnlineStatus('オンライン対戦は公開したURL上でのみ使えます（file:// では相手が開けません）。', 'error');
         return;
       }
+      stopNpcBattle(true);
       online.host();
       refreshOnlineUi();
     });
@@ -298,7 +514,7 @@
   }
 
   // ---- サイドパネルの左右切り替えと開閉 ---------------------------------
-  // ルール早見表・ログ／リプレイ・駒のHP・デバッグ設定などの枠は1つのパネルに
+  // ルール早見表・ログ／リプレイ・駒のHP・対戦設定などの枠は1つのパネルに
   // まとめてあり、盤面の左右どちらへでもまとめて移動できる。
   // 位置と各枠の開閉状態はブラウザに覚えさせ、次に開いたときも同じ見た目にする。
 
@@ -558,6 +774,10 @@
       boardName: $('board-name'),
       loopEntry: $('cfg-loop-entry'),
       chain: $('cfg-chain'),
+      danger: $('cfg-danger'),
+      think: $('cfg-think'),
+      zoneInfo: $('zone-info'),
+      turnTimer: $('turn-timer'),
       placeP1: $('cfg-place-p1'),
       placeP2: $('cfg-place-p2'),
       debugError: $('debug-error'),
@@ -590,7 +810,12 @@
       sidePanel: $('side-panel'),
       panelSlotLeft: $('panel-slot-left'),
       panelSlotRight: $('panel-slot-right'),
-      panelSideToggle: $('panel-side-toggle')
+      panelSideToggle: $('panel-side-toggle'),
+      battleGate: $('battle-gate'),
+      gateButton: $('gate-button'),
+      gateInfo: $('gate-info'),
+      battleStart: $('battle-start'),
+      debugNpc: $('debug-npc')
     };
 
     game = new LB.Game(LB.config);
@@ -603,7 +828,17 @@
     // デバッグ用：ブラウザのコンソールから状態を触れるようにしておく
     // 例) LB.app.game.state.knights[0].hp = 1; LB.app.ui.render();
     dom.debugFields = [dom.maxHp, dom.normalDamage, dom.loopDamage, dom.knockback,
-      dom.wallDamage, dom.boardType, dom.loopEntry, dom.chain, dom.placeP1, dom.placeP2];
+      dom.wallDamage, dom.boardType, dom.loopEntry, dom.chain, dom.danger, dom.think, dom.placeP1, dom.placeP2];
+
+    // 開発者モード：URL に ?dev=1（または #dev）を付けると、開発者向けの注記を表示する
+    if (/[?&]dev=1(&|$)/.test(location.search) || location.hash === '#dev') {
+      document.body.classList.add('dev-mode');
+    }
+
+    // 先攻・後攻の選択（対戦設定）は次回も引き継ぐ
+    var savedSide = loadPref('lb.sideChoice', 'p1');
+    sideChoice = (savedSide === 'p2' || savedSide === 'random') ? savedSide : 'p1';
+    markSideButton();
 
     // 初期化は1つずつ独立させる。どれかが失敗しても残りは動くようにするため。
     // （以前、駒の絵柄の初期化が失敗するとキャラクター紹介まで動かなくなった）
@@ -612,7 +847,8 @@
      ['キャラクター紹介', initCharacters],
      ['枠の開閉', initPanelToggles],
      ['リプレイ', initReplay],
-     ['オンライン対戦', initOnline]
+     ['オンライン対戦', initOnline],
+     ['戦闘BGM', initBgm]
     ].forEach(function (pair) {
       try {
         pair[1]();
@@ -622,7 +858,14 @@
       }
     });
 
-    LB.app = { game: game, ui: ui, online: function () { return online; } };
+    LB.app = {
+      game: game, ui: ui,
+      online: function () { return online; },
+      npc: function () { return npc; },
+      bgm: function () { return bgm; }
+    };
+    ui.onBeforeRender = syncGate;   // 描画のたびにモードに合わせて関門の状態をそろえる
+    ui.onBattleStartEnd = syncTimer;   // 演出が終わったら考える時間を数え始める
 
     $('restart').addEventListener('click', function () {
       game.reset();
@@ -630,8 +873,8 @@
       ui.routeChoice = null;
       ui.hoverPath = null;
       ui.flashPath = null;
-      ui.render();
       if (isOnline()) online.session.pushConfig(); // 相手の盤面もリセットする
+      refreshOnlineUi();   // NPC・オンライン対戦なら再び「バトル開始」待ちになる
     });
 
     $('toggle-coords').addEventListener('click', function () {
@@ -641,7 +884,7 @@
     // ③ 降参（手詰まりで続ける意味が無いとき）
     dom.resign.addEventListener('click', function () {
       if (game.state.winner) return;
-      var loser = isOnline() ? ui.localPlayer : game.state.currentPlayer;
+      var loser = ui.localPlayer || game.state.currentPlayer;   // オンライン・NPC対戦では自分の側
       var label = LB.PLAYER_LABEL[loser];
       if (!window.confirm(label + ' の負けとして対局を終了します。降参しますか？')) return;
       game.resign(loser);
@@ -655,10 +898,11 @@
     });
 
     dom.pass.addEventListener('click', function () {
-      game.pass();
-      ui.selectedId = null;
-      ui.render();
+      ui.afterAction(game.pass());   // 1手として扱い、オンライン同期・NPCの手番へつなぐ
     });
+
+    // バトル開始の関門のボタン
+    dom.gateButton.addEventListener('click', pressStart);
 
     function applyFromForm() {
       try {
@@ -679,6 +923,15 @@
     }
 
     $('debug-apply').addEventListener('click', applyFromForm);
+
+    // この設定でNPCと対戦（押し直すとNPC対戦をやめる）
+    dom.debugNpc.addEventListener('click', function () {
+      if (npc) { stopNpcBattle(); return; }
+      if (online && online.peer) return;   // オンライン対戦の部屋があるあいだは使えない
+      applyFromForm();                      // 画面の設定を反映して盤面を作り直す
+      if (dom.debugError.textContent) return;
+      startNpcBattle(sideChoice);           // ランダムなら「バトル開始」で抽選する
+    });
 
     // 盤面の種類は選んだ時点で切り替える
     dom.boardType.addEventListener('change', applyFromForm);

@@ -21,7 +21,7 @@ window.LB = window.LB || {};
 (function (LB) {
   'use strict';
 
-  var PROTOCOL_VERSION = 2;
+  var PROTOCOL_VERSION = 3;   // 3: バトル開始の「準備完了」合図を追加
 
   function other(player) { return player === 'p1' ? 'p2' : 'p1'; }
 
@@ -39,9 +39,12 @@ window.LB = window.LB || {};
     this.transport = deps.transport;
     this.role = deps.role;
     this.hostPlayer = deps.hostPlayer || 'p1';
+    this.randomSide = !!deps.randomSide;   // 先攻・後攻をバトル開始時に抽選するか
     this.onChange = deps.onChange || function () {};
     this.onStatus = deps.onStatus || function () {};
     this.connected = false;
+    // バトル開始の準備状況。対局（round）ごとに { p1: true, p2: false } の形で持つ
+    this.ready = {};
 
     var self = this;
     this.transport.onOpen = function () { self.handleOpen(); };
@@ -59,9 +62,10 @@ window.LB = window.LB || {};
     return this.game.state.currentPlayer === this.localPlayer();
   };
 
-  /** host が先攻・後攻を変更する */
-  Session.prototype.setHostPlayer = function (player) {
+  /** host が先攻・後攻を変更する（random なら開始時に抽選） */
+  Session.prototype.setHostPlayer = function (player, random) {
     this.hostPlayer = player === 'p2' ? 'p2' : 'p1';
+    this.randomSide = !!random;
     this.pushConfig();
     this.onChange({ sideChanged: true });
   };
@@ -73,6 +77,7 @@ window.LB = window.LB || {};
       t: 'sync',
       v: PROTOCOL_VERSION,
       hostPlayer: this.hostPlayer,
+      randomSide: this.randomSide,
       config: this.game.config,
       state: this.game.state,
       log: this.game.log
@@ -90,9 +95,54 @@ window.LB = window.LB || {};
   Session.prototype.handleOpen = function () {
     this.connected = true;
     this.onStatus('接続しました。' + this.playerLabel() + ' として対戦します。', 'ok');
-    // host が現在の設定・担当・盤面を送って初期同期する
-    if (this.role === 'host') this.send(this.snapshot());
+    if (this.role === 'host') {
+      // 新しい対戦として盤面を用意し直し、お互いが「バトル開始」を押すのを待つ
+      this.game.reset();
+      this.send(this.snapshot());
+    }
     this.onChange();
+  };
+
+  // ---- バトル開始（お互いが準備完了したら始める）------------------------
+
+  /** 今の対局での準備状況 { me, opponent } */
+  Session.prototype.readyState = function () {
+    var r = this.ready[this.game.state.round] || {};
+    return { me: !!r[this.localPlayer()], opponent: !!r[other(this.localPlayer())] };
+  };
+
+  function markRound(session, round, player) {
+    if (!session.ready[round]) session.ready[round] = {};
+    session.ready[round][player] = true;
+  }
+
+  /** 自分が「バトル開始」を押した */
+  Session.prototype.markReady = function () {
+    var round = this.game.state.round;
+    markRound(this, round, this.localPlayer());
+    this.send({ t: 'ready', v: PROTOCOL_VERSION, round: round, player: this.localPlayer() });
+    this.checkStart();
+    this.onChange();
+  };
+
+  /**
+   * 両者そろったら開始する。開始を決めるのは host だけ
+   * （同時に押しても開始が二重にならないようにするため）。
+   */
+  Session.prototype.checkStart = function () {
+    if (this.role !== 'host') return;
+    var state = this.game.state;
+    var r = this.ready[state.round] || {};
+    if (state.started || state.winner || !r.p1 || !r.p2) return;
+    if (this.randomSide) {
+      // ランダム指定なら、ここで初めて先攻・後攻を決める
+      this.hostPlayer = Math.random() < 0.5 ? 'p1' : 'p2';
+      this.game.pushLog('抽選の結果、部屋主が' + (this.hostPlayer === 'p1' ? '先攻（青）' : '後攻（赤）') + 'になりました。', 'info');
+    }
+    state.started = true;
+    this.game.pushLog('バトル開始！', 'win');
+    this.send(this.snapshot());
+    this.onChange({ battleStart: true, sideChanged: this.randomSide });
   };
 
   Session.prototype.playerLabel = function () {
@@ -117,7 +167,14 @@ window.LB = window.LB || {};
       if (applied.sideChanged && this.connected) {
         this.onStatus('あなたは ' + this.playerLabel() + ' です。', 'ok');
       }
-      this.onChange({ boardRebuilt: applied.boardRebuilt, sideChanged: applied.sideChanged });
+      this.onChange({
+        boardRebuilt: applied.boardRebuilt, sideChanged: applied.sideChanged,
+        battleStart: applied.battleStart
+      });
+    } else if (msg.t === 'ready') {
+      markRound(this, msg.round, msg.player);
+      this.checkStart();
+      this.onChange();
     } else if (msg.t === 'request-sync') {
       // 相手から「盤面を最新にしてほしい」と言われたので送り返す
       this.send(this.snapshot());
@@ -132,7 +189,12 @@ window.LB = window.LB || {};
   /** 受け取った内容で自分の状態を置き換える */
   Session.prototype.applySnapshot = function (msg) {
     var game = this.game;
-    var result = { boardRebuilt: false, sideChanged: false };
+    var result = { boardRebuilt: false, sideChanged: false, battleStart: false };
+    // host が開始を決めた（開始前 → 開始後に変わった）ら、こちらでも演出を出す
+    if (msg.state && msg.state.started && !(game.state.started && game.state.round === msg.state.round)) {
+      result.battleStart = true;
+    }
+    if (typeof msg.randomSide === 'boolean') this.randomSide = msg.randomSide;
     if (msg.hostPlayer && msg.hostPlayer !== this.hostPlayer) {
       this.hostPlayer = msg.hostPlayer;
       result.sideChanged = true;

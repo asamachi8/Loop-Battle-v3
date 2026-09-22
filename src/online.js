@@ -74,6 +74,7 @@ window.LB = window.LB || {};
   function Online(deps) {
     this.game = deps.game;
     this.hostPlayer = 'p1'; // host が担当する側（先攻 p1 / 後攻 p2）
+    this.randomSide = false; // true なら先攻・後攻をバトル開始時に抽選する
     this.onSession = deps.onSession || function () {};
     this.onStatus = deps.onStatus || function () {};
     this.onRoom = deps.onRoom || function () {};
@@ -87,10 +88,14 @@ window.LB = window.LB || {};
     this.onStatus(text, kind || 'info');
   };
 
-  /** host の担当（先攻・後攻）を決める。接続前でも接続後でも使える。 */
-  Online.prototype.setHostPlayer = function (player) {
+  /**
+   * host の担当（先攻・後攻）を決める。接続前でも接続後でも使える。
+   * random が true のときは player は仮の担当で、バトル開始時に抽選し直す。
+   */
+  Online.prototype.setHostPlayer = function (player, random) {
     this.hostPlayer = player === 'p2' ? 'p2' : 'p1';
-    if (this.session) this.session.setHostPlayer(this.hostPlayer);
+    this.randomSide = !!random;
+    if (this.session) this.session.setHostPlayer(this.hostPlayer, this.randomSide);
   };
 
   /** 部屋を作る（部屋主側） */
@@ -174,6 +179,7 @@ window.LB = window.LB || {};
       transport: wrapConnection(conn),
       role: this.role,
       hostPlayer: this.hostPlayer,
+      randomSide: this.randomSide,
       onChange: function (info) { self.onSession(self.session, info); },
       onStatus: function (text, kind) { self.status(text, kind); }
     });

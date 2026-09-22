@@ -261,7 +261,55 @@ window.LB = window.LB || {};
       rules.applyDamage(state, enemy, config.NORMAL_DAMAGE, 'normal', events);
     });
 
+    rules.applyDangerZone(state, board, config, knight.owner, events);
     return events;
+  };
+
+  // ---- 危ないマス（仕様書 §35）-----------------------------------------
+  // 決着がつきにくい盤面のための仕組み。一定の手数を過ぎると外周1周が危ないマスになり、
+  // 自分の手番 N 回ごとに、そこにいる自分の騎がダメージを受ける。
+  // 手を指す処理の最後に呼ぶので、NPCの先読み（盤面の複製）にもそのまま反映される。
+
+  /** 外周（最も外側の1周）の交点か */
+  rules.isDangerCell = function (board, r, c) {
+    var n = board.size - 1;
+    return r === 0 || c === 0 || r === n || c === n;
+  };
+
+  /**
+   * 今の危ないマスの状況。
+   * @return { enabled, active, movesLeft（始まるまでの手数）, nextHit（owner の次のダメージまでの自分の手番数） }
+   */
+  rules.dangerZoneInfo = function (state, config, owner) {
+    if (!config.DANGER_ZONE) return { enabled: false, active: false };
+    var start = config.DANGER_ZONE_START;
+    var interval = Math.max(1, config.DANGER_ZONE_INTERVAL || 1);
+    var active = state.turnCount > start;          // turnCount は「今から指す手」の番号
+    var info = { enabled: true, active: active, movesLeft: Math.max(0, start + 1 - state.turnCount) };
+    if (owner) {
+      var ticks = (state.zoneTicks && state.zoneTicks[owner]) || 0;
+      info.nextHit = interval - (ticks % interval);
+    }
+    return info;
+  };
+
+  /** owner が1手指し終えたところで呼ぶ。危ないマスが有効なら数を進め、N 回ごとにダメージを与える */
+  rules.applyDangerZone = function (state, board, config, owner, events) {
+    if (!config.DANGER_ZONE || state.winner) return;
+    if (!(state.turnCount > config.DANGER_ZONE_START)) return;
+    if (!state.zoneTicks) state.zoneTicks = { p1: 0, p2: 0 };
+    if (!state.zoneStarted) {
+      state.zoneStarted = true;
+      events.push({ type: 'zone-start' });
+    }
+    state.zoneTicks[owner] = (state.zoneTicks[owner] || 0) + 1;
+    var interval = Math.max(1, config.DANGER_ZONE_INTERVAL || 1);
+    if (state.zoneTicks[owner] % interval !== 0) return;
+    rules.aliveKnights(state, owner).forEach(function (k) {
+      if (rules.isDangerCell(board, k.r, k.c)) {
+        rules.applyDamage(state, k, config.DANGER_ZONE_DAMAGE || 1, 'zone', events);
+      }
+    });
   };
 
   // ---- 行動：ループ突撃 -------------------------------------------------
@@ -306,6 +354,7 @@ window.LB = window.LB || {};
     knight.c = dest.c;
     events.push({ type: 'move', knightId: knight.id, from: origin, to: dest, charge: true });
 
+    rules.applyDangerZone(state, board, config, knight.owner, events);
     return events;
   };
 

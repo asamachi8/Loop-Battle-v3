@@ -33,6 +33,7 @@ window.LB = window.LB || {};
   var SPARKLE_MIN_R = 34;   // 駒（半径29.1）の外から散り始める
   var SPARKLE_MAX_R = 58;
   var SPARKLE_MS = 1500;    // 1.5秒（CSS の fx-sparkle と合わせること）
+  var BATTLE_START_MS = 1800; // 「ＢＡＴＴＬＥ　ＳＴＡＲＴ」の演出の長さ（CSS の battle-start と合わせること）
 
   // HPの絵筆バッジ。駒の右下に斜めに置く。斜めなので隣の交点とはぶつからない
   var HP_BADGE = { x: 18, y: 18, angle: -28, scale: 1.3 };
@@ -75,6 +76,12 @@ window.LB = window.LB || {};
     this.replay = null;       // リプレイ再生中の状態
     this.replayTimer = null;
     this.onReplayUpdate = null; // 再描画のたびに呼ばれる（リプレイ操作パネル更新用）
+    // バトル開始の関門（NPC対戦・オンライン対戦で使う）
+    this.battleGate = false;    // true のあいだは「バトル開始」を押すまで操作させない
+    this.gateInfo = '';         // 関門の下に出す一言（相手の準備状況など）
+    this.gateWaiting = false;   // 自分は押し済みで相手待ち
+    this.onStartPressed = null; // 「バトル開始」が押されたら呼ばれる
+    this.opponentName = null;   // 手番表示で「相手の番」の代わりに出す名前（例：NPC）
     this.buildBoard();
   }
 
@@ -150,13 +157,14 @@ window.LB = window.LB || {};
     svg.appendChild(gStatic);
 
     this.layers = {
+      zone:   svgEl('g', { 'class': 'layer-zone' }),   // 危ないマス（駒より下に敷く）
       path:   svgEl('g', { 'class': 'layer-path' }),
       hint:   svgEl('g', { 'class': 'layer-hint' }),
       pieces: svgEl('g', { 'class': 'layer-pieces' }),
       hit:    svgEl('g', { 'class': 'layer-hit' }),
       fx:     svgEl('g', { 'class': 'layer-fx' })
     };
-    ['path', 'hint', 'pieces', 'hit', 'fx'].forEach(function (k) {
+    ['zone', 'path', 'hint', 'pieces', 'hit', 'fx'].forEach(function (k) {
       svg.appendChild(self.layers[k]);
     });
 
@@ -293,6 +301,7 @@ window.LB = window.LB || {};
   /** 今このブラウザで操作してよいか（オンライン対戦の手番制御）*/
   UI.prototype.canAct = function () {
     if (this.replay) return false; // リプレイ中は操作させない
+    if (this.battleGate && !this.game.state.started) return false; // バトル開始前
     if (!this.localPlayer) return true;
     return this.game.state.currentPlayer === this.localPlayer;
   };
@@ -303,7 +312,8 @@ window.LB = window.LB || {};
     var delay = 0;
     events.forEach(function (ev) {
       if (ev.type === 'damage') {
-        var cls = ev.mode === 'loop' ? 'fx-loop' : ev.mode === 'wall' ? 'fx-wall' : 'fx-normal';
+        var cls = ev.mode === 'loop' ? 'fx-loop' : ev.mode === 'wall' ? 'fx-wall'
+                : ev.mode === 'zone' ? 'fx-zone' : 'fx-normal';
         self.floatText(ev.r, ev.c, '-' + ev.amount, cls, delay);
         // ループを通った突撃のときだけ、撃たれた側の陣営の色できらきらを散らす
         if (ev.mode === 'loop') {
@@ -515,11 +525,32 @@ window.LB = window.LB || {};
 
   // ---- 全体描画 ---------------------------------------------------------
   UI.prototype.render = function () {
+    if (this.onBeforeRender) this.onBeforeRender();
     this.refreshSelection();
     this.renderBoard();
     this.renderStatus();
     this.renderLog();
     if (this.onReplayUpdate) this.onReplayUpdate();
+  };
+
+  /**
+   * 危ないマス（外周）の表示。始まる10手前から点線で予告し、始まったら赤く塗る。
+   * リプレイ中はそのコマの状態で描く。
+   */
+  UI.prototype.renderDangerZone = function () {
+    var layer = this.layers.zone;
+    while (layer.firstChild) layer.removeChild(layer.firstChild);
+    var game = this.game, board = game.board;
+    var info = rules.dangerZoneInfo(this.viewState(), game.config);
+    if (!info.enabled || (!info.active && info.movesLeft > 10)) return;
+    var cls = info.active ? 'zone-cell zone-active' : 'zone-cell zone-warn';
+    for (var r = 0; r < board.size; r++) {
+      for (var c = 0; c < board.size; c++) {
+        if (!rules.isDangerCell(board, r, c)) continue;
+        var p = board.pointXY(r, c);
+        layer.appendChild(svgEl('rect', { x: p.x - 30, y: p.y - 30, width: 60, height: 60, rx: 10, 'class': cls }));
+      }
+    }
   };
 
   UI.prototype.renderBoard = function () {
@@ -530,6 +561,7 @@ window.LB = window.LB || {};
     clear(this.layers.path);
     clear(this.layers.hint);
     clear(this.layers.pieces);
+    this.renderDangerZone();
     // 経路ハイライトで▲を描いた弧。選択ガイド側で二重に描かないよう控える
     this.pathArcKeys = {};
 
@@ -725,6 +757,19 @@ window.LB = window.LB || {};
       });
     });
 
+    // 危ないマスの状況（有効なときだけ）
+    if (dom.zoneInfo) {
+      var zi = rules.dangerZoneInfo(state, game.config, this.localPlayer || state.currentPlayer);
+      dom.zoneInfo.hidden = !zi.enabled;
+      if (zi.enabled) {
+        var who = this.localPlayer ? 'あなた' : LB.PLAYER_LABEL[state.currentPlayer];
+        dom.zoneInfo.textContent = zi.active
+          ? '⚠ 危ないマス（外周）：' + who + 'の騎がダメージを受けるまで、' + who + 'の手番あと ' + zi.nextHit + ' 回'
+          : '危ないマス：あと ' + zi.movesLeft + ' 手で外周が危ないマスになります';
+        dom.zoneInfo.classList.toggle('is-active', !!zi.active);
+      }
+    }
+
     // 選択中の騎の情報
     if (replaying) {
       dom.hint.textContent = 'リプレイ再生中：' + this.replay.label
@@ -732,8 +777,13 @@ window.LB = window.LB || {};
         + ' — 「停止」で対局に戻ります。';
     } else if (state.winner) {
       dom.hint.textContent = 'RESTART で再戦できます。';
+    } else if (this.battleGate && !state.started) {
+      dom.hint.textContent = this.gateWaiting
+        ? '相手の準備を待っています。'
+        : '盤面の「バトル開始」を押すと対局が始まります。';
     } else if (!this.canAct()) {
-      dom.hint.textContent = '相手の手番です。相手が指すまでお待ちください。';
+      dom.hint.textContent = (this.opponentName || '相手') + 'の手番です。'
+        + (this.opponentName ? '考えています…' : '相手が指すまでお待ちください。');
     } else if (this.routeChoice) {
       dom.hint.textContent = '突撃経路が複数あります。番号バッジをクリックして経路を選んでください（ノックバック方向が変わります）。';
     } else if (this.sel) {
@@ -750,6 +800,57 @@ window.LB = window.LB || {};
     // 手詰まり時のパス
     dom.pass.style.display = (!replaying && !state.winner && this.canAct() && !game.hasAnyAction())
       ? 'block' : 'none';
+
+    // バトル開始の関門：盤面を少し暗くして、真ん中に「バトル開始」ボタンを出す
+    if (dom.battleGate) {
+      var gate = this.battleGate && !replaying && !state.winner && !state.started;
+      dom.battleGate.hidden = !gate;
+      if (gate) {
+        dom.gateButton.disabled = this.gateWaiting;
+        dom.gateButton.textContent = this.gateWaiting ? '準備完了' : 'バトル開始';
+        dom.gateInfo.textContent = this.gateInfo || '';
+      }
+    }
+  };
+
+  /** 「ＢＡＴＴＬＥ　ＳＴＡＲＴ」の演出を出す。終わったら done を呼ぶ */
+  UI.prototype.playBattleStart = function (done) {
+    var el = this.dom.battleStart;
+    if (!el) { if (done) setTimeout(done, 0); return; }
+    el.classList.remove('is-playing');
+    void el.offsetWidth;            // アニメーションを最初からやり直させる
+    el.classList.add('is-playing');
+    clearTimeout(this.battleStartTimer);
+    var self = this;
+    this.battleStartPlaying = true;   // 演出中は考える時間を数えない（main.js の syncTimer）
+    this.battleStartTimer = setTimeout(function () {
+      el.classList.remove('is-playing');
+      self.battleStartPlaying = false;
+      if (done) done();
+      if (self.onBattleStartEnd) self.onBattleStartEnd();
+    }, BATTLE_START_MS);
+  };
+
+  /**
+   * 盤面のクリックを介さずに1手指す（NPC用）。
+   * action は LB.NPC.chooseAction が返す形 { type, knightId, dest, charge }。
+   */
+  UI.prototype.performAction = function (action) {
+    var game = this.game;
+    this.selectedId = null;
+    this.sel = null;
+    this.routeChoice = null;
+    this.hoverPath = null;
+    var events;
+    if (action.type === 'move') {
+      events = game.doNormalMove(rules.getKnight(game.state, action.knightId), action.dest);
+    } else if (action.type === 'charge') {
+      events = game.doLoopCharge(rules.getKnight(game.state, action.knightId), action.charge);
+      this.showPathFlash(action.charge.steps);
+    } else {
+      events = game.pass();
+    }
+    this.afterAction(events);
   };
 
   /**
@@ -778,7 +879,7 @@ window.LB = window.LB || {};
       cls += ' turn-side-' + state.currentPlayer;
       if (this.localPlayer) {
         var mine = state.currentPlayer === this.localPlayer;
-        dom.turnSideWho.textContent = mine ? 'あなたの番' : '相手の番';
+        dom.turnSideWho.textContent = mine ? 'あなたの番' : (this.opponentName || '相手') + 'の番';
         if (mine) cls += ' turn-side-mine';
       } else {
         dom.turnSideWho.textContent = state.currentPlayer === 'p1' ? '青・下側' : '赤・上側';
