@@ -329,7 +329,7 @@
 
       var name = document.createElement('span');
       name.className = 'npc-name';
-      name.textContent = lv.name;
+      name.textContent = lv.display || lv.name;
 
       var note = document.createElement('span');
       note.className = 'npc-note';
@@ -711,7 +711,7 @@
         im.remove();
       });
       var cap = document.createElement('figcaption');
-      cap.textContent = ch.name;
+      cap.textContent = ch.display || ch.name;
       fig.appendChild(im);
       fig.appendChild(cap);
       grid.appendChild(fig);

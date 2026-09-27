@@ -44,9 +44,10 @@ window.LB = window.LB || {};
       id: 'normal',
       level: '普通',
       name: 'ループバトル管理者 マイクロビアル',
+      display: 'ループバトル管理者\nマイクロビアル',   // 画面では2行で出す
       short: 'マイクロビアル',
       image: 'assets/pieces/boardgame/microbial.png',
-      note: '勝ち負けよりもバトルを楽しみたいエンジョイ勢。よく考えて指せば、勝ち越せる強さ。',
+      note: '勝ち負けよりも楽しみたいエンジョイ勢。よく考えて指せば、勝ち越せる。',
       // Ver.0.5 の検証で強すぎたため弱め、2026-09-22 にクローバー盤でこの値を確定（仕様書 §31.2）
       params: { READ_REPLY: 0.3, MARGIN: 10, BLUNDER: 0.1 }
     },
@@ -56,7 +57,7 @@ window.LB = window.LB || {};
       name: '都市英雄 エルドレッド',
       short: 'エルドレッド',
       image: 'assets/pieces/boardgame/eldred.png',
-      note: '人の情などない、勝ち負けにこだわるガチ勢。常に相手の先を読んでいる強さ。',
+      note: '人の情などない。勝ち負けにこだわるガチ勢。常に相手の先を読んでくる。',
       // 2026-09-27：強すぎたので弱めた（調整前は READ_REPLY 1 / MARGIN 4 / BLUNDER 0。仕様書 §31.3）
       params: { READ_REPLY: 0.5, MARGIN: 7, BLUNDER: 0.05 }
     }

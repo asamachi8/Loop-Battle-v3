@@ -61,7 +61,8 @@ window.LB = window.LB || {};
     { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: GALLERY + 'tsuzumi.png' },
     { key: 'asamachi',   name: 'ガイドあさまち',        src: GALLERY + 'asamachi.png' },
     // ボードゲーム会（NPCの2人。駒にも使える）
-    { key: 'microbial',  name: 'ループバトル管理者 マイクロビアル', src: BOARDGAME + 'microbial.png' },
+    // display は「キャラクター紹介」での表示用（2行に分ける）。駒HP枠のドロップダウンは name を使う
+    { key: 'microbial',  name: 'ループバトル管理者 マイクロビアル', display: 'ループバトル管理者\nマイクロビアル', src: BOARDGAME + 'microbial.png' },
     { key: 'eldred',     name: '都市英雄 エルドレッド',            src: BOARDGAME + 'eldred.png' }
   ];
 

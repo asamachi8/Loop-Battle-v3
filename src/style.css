@@ -642,7 +642,7 @@ summary.card-title { cursor: pointer; }
 }
 .char-card figcaption {
   font-family: var(--font-serif); font-size: 12px; line-height: 1.4;
-  color: var(--gold-lit); letter-spacing: .02em;
+  color: var(--gold-lit); letter-spacing: .02em; white-space: pre-line;
 }
 /* 画像が読めなかったカード。名前だけ残して、欠けていることが分かるようにする */
 .char-card-missing {
@@ -830,7 +830,7 @@ summary.card-title { cursor: pointer; }
   font-family: var(--font-serif); font-size: 11px; letter-spacing: .12em;
   color: var(--gold-lit); border: 1px solid rgba(200, 164, 74, .4); border-radius: 999px; padding: 0 8px;
 }
-.npc-name { font-size: 12px; font-family: var(--font-serif); line-height: 1.3; }
+.npc-name { font-size: 12px; font-family: var(--font-serif); line-height: 1.35; white-space: pre-line; }
 .npc-note { font-size: 10.5px; color: var(--muted); line-height: 1.45; white-space: pre-line; }
 @media (max-width: 480px) {
   .npc-medal { width: 72px; height: 72px; }
