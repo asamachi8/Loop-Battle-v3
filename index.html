@@ -14,7 +14,7 @@
 <meta name="application-name" content="LOOP BATTLE">
 <!-- ?v= はキャッシュ避け。GitHub Pages は CSS/JS をブラウザにキャッシュさせるため、
      更新しても古いファイルが使われることがある。公開するたびにこの数字を上げること。 -->
-<link rel="stylesheet" href="src/style.css?v=1.0.0">
+<link rel="stylesheet" href="src/style.css?v=1.0.4">
 </head>
 <body>
 
@@ -141,44 +141,12 @@
       </p>
     </details>
 
-    <details class="card" id="log-card" open>
-      <summary class="card-title">ログ / リプレイ</summary>
-      <div class="replay-bar">
-        <select id="replay-source" class="replay-select"></select>
-        <div class="replay-buttons">
-          <button id="replay-play" class="btn btn-small">▶ 再生</button>
-          <button id="replay-stop" class="btn btn-small">■ 停止</button>
-          <button id="replay-prev" class="btn btn-small" title="1コマ戻る">◀</button>
-          <button id="replay-next" class="btn btn-small" title="1コマ進む">▶|</button>
-          <span id="replay-pos" class="replay-pos">—</span>
-        </div>
-      </div>
-      <div id="log" class="log"></div>
-      <p class="note">
-        直近3対局までを振り返れます。再生すると盤面とログが1手ずつ進み、「停止」で対局に戻ります。<br>
-        リプレイ中は盤面を操作できません。記録はページを開いている間だけ保持されます。
-      </p>
-    </details>
-
     <details class="card" id="roster-card" open>
       <summary class="card-title">駒のHP</summary>
       <h2 class="card-title p1">Player 1（青 / 下側）</h2>
       <div id="roster-p1" class="roster"></div>
       <h2 class="card-title p2">Player 2（赤 / 上側）</h2>
       <div id="roster-p2" class="roster"></div>
-    </details>
-
-    <!-- キャラクター紹介。駒に使える絵柄を大きく並べて見せる -->
-    <details class="card" id="chars-card" open>
-      <summary class="card-title">キャラクター紹介</summary>
-      <label class="field-inline">
-        <span>コレクション</span>
-        <select id="char-collection">
-          <option value="gallery">幻想肖像画美術館</option>
-          <option value="next">To Be Continued…</option>
-        </select>
-      </label>
-      <div id="char-gallery" class="char-gallery"></div>
     </details>
 
     <details class="card" id="debug-card" open>
@@ -229,15 +197,50 @@
         <button id="debug-apply" class="btn" title="設定を反映して、対局を最初からやり直します">適用</button>
         <button id="debug-reset" class="btn btn-ghost">初期値に戻す</button>
       </div>
+      <!-- 対戦するNPC。メダルをクリックして選ぶ（中身は src/npc.js の LB.NPC_LEVELS） -->
+      <h3 class="npc-heading">NPC（コンピューター）を選ぶ</h3>
+      <div id="npc-choice" class="npc-choice"></div>
       <div class="debug-actions npc-row">
         <button id="debug-npc" class="btn btn-primary">この設定でNPCと対戦</button>
       </div>
       <p class="note">
-        NPC（コンピューター）の強さは「普通」です。上の設定がそのまま使われます。<br>
-        あなたの先攻・後攻は上の「先攻・後攻」で選べます。
+        上の設定がそのままNPC対戦にも使われます。あなたの先攻・後攻は上の「先攻・後攻」で選べます。
       </p>
       <!-- 開発者向け。URL に ?dev=1 を付けたときだけ表示される -->
       <p class="note dev-only">恒久的に変更する場合は <code>src/config.js</code> を編集してください。</p>
+    </details>
+
+    <details class="card" id="log-card" open>
+      <summary class="card-title">ログ / リプレイ</summary>
+      <div class="replay-bar">
+        <select id="replay-source" class="replay-select"></select>
+        <div class="replay-buttons">
+          <button id="replay-play" class="btn btn-small">▶ 再生</button>
+          <button id="replay-stop" class="btn btn-small">■ 停止</button>
+          <button id="replay-prev" class="btn btn-small" title="1コマ戻る">◀</button>
+          <button id="replay-next" class="btn btn-small" title="1コマ進む">▶|</button>
+          <span id="replay-pos" class="replay-pos">—</span>
+        </div>
+      </div>
+      <div id="log" class="log"></div>
+      <p class="note">
+        直近3対局までを振り返れます。再生すると盤面とログが1手ずつ進み、「停止」で対局に戻ります。<br>
+        リプレイ中は盤面を操作できません。記録はページを開いている間だけ保持されます。
+      </p>
+    </details>
+
+    <!-- キャラクター紹介。駒に使える絵柄を大きく並べて見せる -->
+    <details class="card" id="chars-card" open>
+      <summary class="card-title">キャラクター紹介</summary>
+      <label class="field-inline">
+        <span>コレクション</span>
+        <select id="char-collection">
+          <option value="gallery">幻想肖像画美術館</option>
+          <option value="boardgame">ボードゲーム会</option>
+          <option value="next">To Be Continued…</option>
+        </select>
+      </label>
+      <div id="char-gallery" class="char-gallery"></div>
     </details>
 
 
@@ -245,15 +248,15 @@
   </div>
 </main>
 
-<script src="src/config.js?v=1.0.0"></script>
-<script src="src/board.js?v=1.0.0"></script>
-<script src="src/rules.js?v=1.0.0"></script>
-<script src="src/game.js?v=1.0.0"></script>
-<script src="src/npc.js?v=1.0.0"></script>
-<script src="src/bgm.js?v=1.0.0"></script>
-<script src="src/ui.js?v=1.0.0"></script>
-<script src="src/net.js?v=1.0.0"></script>
-<script src="src/online.js?v=1.0.0"></script>
-<script src="src/main.js?v=1.0.0"></script>
+<script src="src/config.js?v=1.0.4"></script>
+<script src="src/board.js?v=1.0.4"></script>
+<script src="src/rules.js?v=1.0.4"></script>
+<script src="src/game.js?v=1.0.4"></script>
+<script src="src/npc.js?v=1.0.4"></script>
+<script src="src/bgm.js?v=1.0.4"></script>
+<script src="src/ui.js?v=1.0.4"></script>
+<script src="src/net.js?v=1.0.4"></script>
+<script src="src/online.js?v=1.0.4"></script>
+<script src="src/main.js?v=1.0.4"></script>
 </body>
 </html>

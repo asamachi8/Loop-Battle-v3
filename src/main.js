@@ -138,8 +138,8 @@
   function syncGate() {
     var active = isOnline();
     ui.localPlayer = active ? online.session.localPlayer() : (npc ? npc.human : null);
-    ui.battleGate = active || !!npc;
-    ui.opponentName = (npc && !active) ? 'NPC' : null;
+    ui.battleGate = true;   // どのモードでも「バトル開始」を押してから始める（Ver.1.0.1）
+    ui.opponentName = (npc && !active) ? LB.NPC.current().short : null;   // 例：マイクロビアル
     if (active) {
       var rs = online.session.readyState();
       ui.gateWaiting = rs.me;
@@ -149,12 +149,12 @@
         + (online.session.randomSide ? '\n先攻・後攻は開始時に抽選します。' : '');
     } else if (npc) {
       ui.gateWaiting = false;
-      ui.gateInfo = 'NPC（' + LB.NPC.LEVEL + '）と対戦します。' + (npc.choice === 'random'
+      ui.gateInfo = LB.NPC.current().name + '（' + LB.NPC.current().level + '）と対戦します。' + (npc.choice === 'random'
         ? '先攻・後攻は開始時に抽選します。'
         : 'あなたは ' + sideLabel(npc.human) + ' です。');
     } else {
       ui.gateWaiting = false;
-      ui.gateInfo = '';
+      ui.gateInfo = '同じPCで2人で対戦します。交互に操作してください。';
     }
     syncBgm();
     syncTimer();
@@ -168,7 +168,7 @@
 
   function inBattleNow() {
     var st = game.state;
-    return !st.winner && (ui.battleGate ? !!st.started : st.turnCount > 1);
+    return !st.winner && !!st.started;
   }
 
   function syncTimer() {
@@ -222,13 +222,14 @@
   var bgm = null;
 
   /**
-   * 「戦闘中」の間だけ鳴らす。NPC・オンライン対戦は BATTLE START から、
-   * ローカル対戦は最初の1手から。勝敗が付いたら止め、RESTART で次の曲を選び直す。
+   * 「戦闘中」の間だけ鳴らす。鳴り始めるのは「バトル開始」を押したとき
+   * （どのモードでも関門を出すので、設定を試しているあいだは鳴らない）。
+   * 勝敗が付いたら止め、RESTART で次の曲を選び直す。
    */
   function syncBgm() {
     if (!bgm) return;
     var st = game.state;
-    var inBattle = !st.winner && (ui.battleGate ? !!st.started : st.turnCount > 1);
+    var inBattle = !st.winner && !!st.started;
     bgm.sync(inBattle, st.round);
     markBgmVolume();
   }
@@ -284,8 +285,8 @@
       online.session.markReady();         // 両者そろったら host が開始を決める
       return;
     }
-    if (!npc || game.state.started) return;
-    if (npc.choice === 'random') {
+    if (game.state.started) return;
+    if (npc && npc.choice === 'random') {
       // ランダム指定なら、ここで初めて先攻・後攻を決める
       npc.human = Math.random() < 0.5 ? 'p1' : 'p2';
       npc.cpu = npc.human === 'p1' ? 'p2' : 'p1';
@@ -298,13 +299,79 @@
     ui.playBattleStart(scheduleNpc);      // 演出が終わってから、NPCが先攻なら指す
   }
 
+  // ---- 対戦するNPCを選ぶ（対戦設定のメダル。仕様書 §31）-----------------
+
+  /** メダルの見た目を、いま選ばれているNPCに合わせる */
+  function markNpcChoice() {
+    var id = LB.NPC.current().id;
+    Array.prototype.forEach.call(dom.npcChoice.querySelectorAll('.npc-card'), function (el) {
+      el.classList.toggle('is-active', el.getAttribute('data-npc') === id);
+      el.setAttribute('aria-pressed', el.getAttribute('data-npc') === id ? 'true' : 'false');
+    });
+  }
+
+  function initNpcChoice() {
+    LB.NPC_LEVELS.forEach(function (lv) {
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'npc-card';
+      card.setAttribute('data-npc', lv.id);
+      card.title = lv.note;
+
+      var img = document.createElement('img');
+      img.className = 'npc-medal';
+      img.src = lv.image;
+      img.alt = lv.name;
+
+      var lvl = document.createElement('span');
+      lvl.className = 'npc-level';
+      lvl.textContent = lv.level;
+
+      var name = document.createElement('span');
+      name.className = 'npc-name';
+      name.textContent = lv.name;
+
+      var note = document.createElement('span');
+      note.className = 'npc-note';
+      // 「。」ごとに改行して読みやすくする（CSS の white-space: pre-line と対）
+      note.textContent = lv.note.replace(/。/g, '。\n').trim();
+
+      card.appendChild(img);
+      card.appendChild(lvl);
+      card.appendChild(name);
+      card.appendChild(note);
+      card.addEventListener('click', function () { chooseNpc(lv.id); });
+      dom.npcChoice.appendChild(card);
+    });
+
+    var saved = loadPref('lb.npcLevel', 'normal');
+    LB.NPC.setLevel(saved);
+    markNpcChoice();
+  }
+
+  /** NPCを選び直す。NPC対戦中なら、その相手で対局を仕切り直す */
+  function chooseNpc(id) {
+    var lv = LB.NPC.setLevel(id);
+    savePref('lb.npcLevel', lv.id);
+    markNpcChoice();
+    if (npc && !isOnline()) {
+      startNpcBattle(npc.choice);   // 相手が変わるので「バトル開始」待ちからやり直す
+      game.reset();
+      ui.selectedId = null;
+      ui.render();
+    } else {
+      setOnlineStatus('対戦相手を ' + lv.name + '（' + lv.level + '）にしました。'
+        + '「この設定でNPCと対戦」で始められます。', 'info');
+    }
+  }
+
   /** choice は 'p1' | 'p2' | 'random'。ランダムは「バトル開始」を押したときに抽選する */
   function startNpcBattle(choice) {
     var human = choice === 'p2' ? 'p2' : 'p1';   // ランダムのときは開始までの仮の担当
     npc = { choice: choice, human: human, cpu: human === 'p1' ? 'p2' : 'p1' };
     ui.selectedId = null;
     refreshOnlineUi();
-    setOnlineStatus('NPC対戦（' + LB.NPC.LEVEL + '）の準備ができました。盤面の「バトル開始」を押してください。', 'ok');
+    setOnlineStatus('NPC対戦の準備ができました（' + LB.NPC.current().name + '・' + LB.NPC.current().level + '）。盤面の「バトル開始」を押してください。', 'ok');
   }
 
   function stopNpcBattle(silent) {
@@ -591,15 +658,20 @@
   // 駒に使える絵柄を、盤上より大きいサイズで並べて見せる枠。
   // コレクションを増やしたくなったら CHAR_COLLECTIONS に足す。
 
+  // どのコレクションでも同じ説明文を出す（中身の並びだけが変わる）
+  var CHAR_NOTE = '駒に使えるメダル。「駒のHP」枠のドロップダウンで、どの騎に使うか選べます。';
+
   var CHAR_COLLECTIONS = {
     gallery: {
       title: '幻想肖像画美術館',
-      note: '駒に使える6枚。「駒のHP」枠のドロップダウンで、どの騎に使うか選べます。',
-      keys: null   // null = LB.PIECE_CHARACTERS の全部
+      keys: ['amerigo', 'aosuke', 'marguerite', 'jane-doe', 'tsuzumi', 'asamachi']
+    },
+    boardgame: {
+      title: 'ボードゲーム会',
+      keys: ['microbial', 'eldred']   // NPCの2人。駒としても使える
     },
     next: {
       title: 'To Be Continued…',
-      note: '新しい駒ができたら、ここに並びます。',
       keys: []     // 空 = まだ中身なし
     }
   };
@@ -611,7 +683,7 @@
 
     var note = document.createElement('p');
     note.className = 'char-note';
-    note.textContent = col.note;
+    note.textContent = CHAR_NOTE;
     box.appendChild(note);
 
     var all = LB.PIECE_CHARACTERS || [];
@@ -815,7 +887,8 @@
       gateButton: $('gate-button'),
       gateInfo: $('gate-info'),
       battleStart: $('battle-start'),
-      debugNpc: $('debug-npc')
+      debugNpc: $('debug-npc'),
+      npcChoice: $('npc-choice')
     };
 
     game = new LB.Game(LB.config);
@@ -848,7 +921,8 @@
      ['枠の開閉', initPanelToggles],
      ['リプレイ', initReplay],
      ['オンライン対戦', initOnline],
-     ['戦闘BGM', initBgm]
+     ['戦闘BGM', initBgm],
+     ['NPCの選択', initNpcChoice]
     ].forEach(function (pair) {
       try {
         pair[1]();
@@ -866,6 +940,7 @@
     };
     ui.onBeforeRender = syncGate;   // 描画のたびにモードに合わせて関門の状態をそろえる
     ui.onBattleStartEnd = syncTimer;   // 演出が終わったら考える時間を数え始める
+    ui.render();                    // 最初の描画は上を設定する前に済んでいるので、関門を出すために描き直す
 
     $('restart').addEventListener('click', function () {
       game.reset();
