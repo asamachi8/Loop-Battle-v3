@@ -58,8 +58,9 @@ window.LB = window.LB || {};
       short: 'エルドレッド',
       image: 'assets/pieces/boardgame/eldred.png',
       note: '人の情などない。勝ち負けにこだわるガチ勢。常に相手の先を読んでくる。',
-      // 2026-09-27：強すぎたので弱めた（調整前は READ_REPLY 1 / MARGIN 4 / BLUNDER 0。仕様書 §31.3）
-      params: { READ_REPLY: 0.5, MARGIN: 7, BLUNDER: 0.05 }
+      // 強さの変遷（仕様書 §31.3）：最初は READ_REPLY 1 / MARGIN 4 / BLUNDER 0（人がほぼ勝てない）
+      // → 2026-09-27 に 0.5 / 7 / 0.05（人が約27%勝つ）→ 2026-10-03 に少し戻した（人が約14%勝つ）
+      params: { READ_REPLY: 0.65, MARGIN: 7, BLUNDER: 0.05 }
     }
   ];
 

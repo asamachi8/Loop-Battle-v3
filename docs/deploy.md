@@ -33,16 +33,16 @@ GitHub Pages は `src/*.js` と `src/style.css` をブラウザにキャッシ�
 そのため **HTML だけ新しくなって、JS が古いまま**という状態が起こり、
 「新しい枠は出るのに中身が空」といった中途半端な壊れ方をします。
 
-これを防ぐため、`index.html` の読み込みタグに `?v=1.0.5` を付けてあります。
+これを防ぐため、`index.html` の読み込みタグに `?v=1.0.8` を付けてあります。
 
 ```html
-<link rel="stylesheet" href="src/style.css?v=1.0.5">
-<script src="src/config.js?v=1.0.5"></script>
+<link rel="stylesheet" href="src/style.css?v=1.0.8">
+<script src="src/config.js?v=1.0.8"></script>
 …（9ファイルすべてに付いています）
 ```
 
 **`src/` の中身を変えて公開するときは、この数字をすべて同じ値に上げてください**
-（`1.0.5` → `1.0.6` など）。数字が変わるとブラウザは別のファイルとして読み直すので、
+（`1.0.8` → `1.0.9` など）。数字が変わるとブラウザは別のファイルとして読み直すので、
 古いキャッシュが使われなくなります。
 
 それでも反映されないときは `Ctrl + Shift + R`（強制再読み込み）を試してください。
@@ -51,24 +51,21 @@ GitHub Pages は `src/*.js` と `src/style.css` をブラウザにキャッシ�
 
 ## アップロードするもの
 
-**Ver.1.0 から、アップロード用のフォルダを用意しています：**
-`Cowork\ループバトル\Loop Battle Ver1.0 GitHubアップロード用`
+**このフォルダ（`Cowork\ループバトル\Loop Battle Ver1.0 githubver`）の中身を、そのまま全部**上げてください。
+除外するファイルはありません（2026-10-03 に、アップロード専用のフォルダは廃止してこの1つにまとめました）。
 
-このフォルダを開き、**中身をすべて選んで**（Ctrl+A）GitHub の `Upload files` の画面へドラッグしてください。
+フォルダを開き、**中身をすべて選んで**（Ctrl+A）GitHub の `Upload files` の画面へドラッグします。
 フォルダそのものではなく「中身」を入れるのがポイントです（`index.html` がリポジトリの一番上に来るように）。
 
-アップロード用フォルダには、次のものを**入れていません**（ゲームは読み込まないため）：
-
-- 駒の元画像 `assets/pieces/*/original/`（約16MB）
-- アイコンの元画像 `assets/icons/original/`
-- 空の置き場 `assets/ui/`・`assets/reference/`、`.gitignore`
-
-素材の元データは `Cowork\ループバトル\控え素材（ループバトル関係）` に保管しています。
+> ⚠️ **元画像（`original/` フォルダ）をこのフォルダに置かないでください。**
+> ゲームは読み込まず、LICENSE でも「素材は配布しない」と決めているためです。
+> 元画像は `Cowork\ループバトル\控え素材（ループバトル関係）` と `ループバトル新メダルデザイン` に保管しています。
 
 中身は次のとおりです。
 
 ```
 index.html          ← これがトップページになる
+guidelines.html     ← 利用ガイドラインのページ（index.html の下のボタンから開く）
 manifest.webmanifest ← ホーム画面・ショートカットの名前とアイコンの設定
 src/                ← ゲーム本体（vendor/peerjs.min.js も必要）
 assets/             ← 画像（額縁・駒）と戦闘BGM（bgm/ に mp3 が3曲・計約10MB）
@@ -82,6 +79,7 @@ LICENSE
 これが無いとオンライン対戦を開始したときに読み込みエラーになります。
 
 `assets/icons/` と `manifest.webmanifest` を入れ忘れると、ショートカットのアイコンが出ません（ゲームは動きます）。
+`.gitignore` と `assets/ui/.gitkeep`・`assets/reference/.gitkeep` は空の置き場で、上げても害はありません。
 `assets/bgm/` の mp3（3曲）も含めてください。無いと戦闘BGMだけが鳴らなくなります（ゲームは動きます）。
 GitHub のブラウザからのアップロードは1ファイル25MBまでなので、1曲3〜4MBなら問題ありません。
 
