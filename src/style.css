@@ -625,7 +625,7 @@ summary.card-title { cursor: pointer; }
 }
 .char-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
   gap: 12px;
 }
 .char-card {
@@ -640,9 +640,33 @@ summary.card-title { cursor: pointer; }
   margin: 0 auto 6px;
   filter: drop-shadow(0 3px 7px rgba(0, 0, 0, .6));
 }
-.char-card figcaption {
+.char-card figcaption, .char-name {
   font-family: var(--font-serif); font-size: 12px; line-height: 1.4;
   color: var(--gold-lit); letter-spacing: .02em; white-space: pre-line;
+}
+
+/* キャラごとの紹介文。名前の前の ▼ で開閉する */
+.char-intro { text-align: left; }
+.char-intro > summary.char-name {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: flex-start; gap: 5px; justify-content: center;
+  text-align: center;
+}
+.char-intro > summary::-webkit-details-marker { display: none; }
+.char-intro > summary::before {
+  content: '▼'; flex: 0 0 auto; margin-top: .15em;
+  font-size: 9px; color: var(--gold-deep);
+  transition: transform .15s ease, color .15s ease;
+}
+.char-intro[open] > summary::before { transform: rotate(180deg); color: var(--gold); }   /* 開くと ▲ */
+.char-intro > summary:hover::before { color: var(--gold-lit); }
+.char-intro-text {
+  margin: 6px 2px 0; padding-top: 6px;
+  border-top: 1px solid rgba(200, 164, 74, .22);
+  font-size: 11.5px; line-height: 1.8; color: var(--ink); text-align: left;
+  /* 文節で折り返す（対応していないブラウザは通常の折り返しになる）。
+     句読点や小書き文字が行頭に来ないよう line-break: strict も指定 */
+  word-break: auto-phrase; line-break: strict;
 }
 /* 画像が読めなかったカード。名前だけ残して、欠けていることが分かるようにする */
 .char-card-missing {

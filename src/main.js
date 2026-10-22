@@ -664,7 +664,8 @@
   var CHAR_COLLECTIONS = {
     gallery: {
       title: '幻想肖像画美術館',
-      keys: ['amerigo', 'aosuke', 'marguerite', 'jane-doe', 'tsuzumi', 'asamachi']
+      // 並び順はユーザー指定（2026-10-22）。あさまち → ツヅミ → アオスケ → ジェーン → アメリゴ → マルグリット
+      keys: ['asamachi', 'tsuzumi', 'aosuke', 'jane-doe', 'amerigo', 'marguerite']
     },
     boardgame: {
       title: 'ボードゲーム会',
@@ -710,10 +711,27 @@
         fig.classList.add('char-card-missing');
         im.remove();
       });
-      var cap = document.createElement('figcaption');
-      cap.textContent = ch.display || ch.name;
       fig.appendChild(im);
-      fig.appendChild(cap);
+
+      // 名前の前に ▼ を置き、紹介文はキャラごとに開閉できるようにする
+      if (ch.intro) {
+        var det = document.createElement('details');
+        det.className = 'char-intro';
+        var sum = document.createElement('summary');
+        sum.className = 'char-name';
+        sum.textContent = ch.display || ch.name;
+        var intro = document.createElement('p');
+        intro.className = 'char-intro-text';
+        intro.textContent = ch.intro;
+        det.appendChild(sum);
+        det.appendChild(intro);
+        fig.appendChild(det);
+      } else {
+        var cap = document.createElement('figcaption');
+        cap.className = 'char-name';
+        cap.textContent = ch.display || ch.name;
+        fig.appendChild(cap);
+      }
       grid.appendChild(fig);
     });
     box.appendChild(grid);

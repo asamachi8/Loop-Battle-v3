@@ -54,16 +54,26 @@ window.LB = window.LB || {};
   var GALLERY = 'assets/pieces/fantasy-museum/';
   var BOARDGAME = 'assets/pieces/boardgame/';
   LB.PIECE_CHARACTERS = [
-    { key: 'amerigo',    name: 'アメリゴ船長',         src: GALLERY + 'amerigo.png' },
-    { key: 'aosuke',     name: 'シンガーアオスケ',      src: GALLERY + 'aosuke.png' },
-    { key: 'marguerite', name: 'マルグリットメイド長',   src: GALLERY + 'marguerite.png' },
-    { key: 'jane-doe',   name: 'ジェーンドゥ',         src: GALLERY + 'jane-doe.png' },
-    { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: GALLERY + 'tsuzumi.png' },
-    { key: 'asamachi',   name: 'ガイドあさまち',        src: GALLERY + 'asamachi.png' },
+    // intro は「キャラクター紹介」で名前の下に出す紹介文（▼で開閉する）。
+    // もとの文は 控え素材\ループバトル新メダルデザイン\メダルキャラクター紹介.txt
+    { key: 'amerigo',    name: 'アメリゴ船長',         src: GALLERY + 'amerigo.png',
+      intro: 'ツバメ船長の肖像画。海とお喋りをこよなく愛すMr.ロマン。私と話をしよう!!!' },
+    { key: 'aosuke',     name: 'シンガーアオスケ',      src: GALLERY + 'aosuke.png',
+      intro: '人の魂よりも、音楽のグルーヴが好き。南国で自由気楽に過ごしている。' },
+    { key: 'marguerite', name: 'マルグリットメイド長',   src: GALLERY + 'marguerite.png',
+      intro: 'アライグマのメイドの肖像画。よく世話焼きすぎてお節介になる。掃除が趣味。' },
+    { key: 'jane-doe',   name: 'ジェーンドゥ',         src: GALLERY + 'jane-doe.png',
+      intro: '黒猫夫人の肖像画。タイトル不明。一言も話さないが、視線と目力でなんとなく要望がわかる。' },
+    { key: 'tsuzumi',    name: 'ツヅミサロン長',        src: GALLERY + 'tsuzumi.png',
+      intro: '創作サロン・ぎんがむたんぽぽのトップ。経験豊富、幅広く知識を持つ。' },
+    { key: 'asamachi',   name: 'ガイドあさまち',        src: GALLERY + 'asamachi.png',
+      intro: '美術館のガイド。興味があればすぐ試そうとする無茶ぶり。' },
     // ボードゲーム会（NPCの2人。駒にも使える）
     // display は「キャラクター紹介」での表示用（2行に分ける）。駒HP枠のドロップダウンは name を使う
-    { key: 'microbial',  name: 'ループバトル管理者 マイクロビアル', display: 'ループバトル管理者\nマイクロビアル', src: BOARDGAME + 'microbial.png' },
-    { key: 'eldred',     name: '都市英雄 エルドレッド',            src: BOARDGAME + 'eldred.png' }
+    { key: 'microbial',  name: 'ループバトル管理者 マイクロビアル', display: 'ループバトル管理者\nマイクロビアル', src: BOARDGAME + 'microbial.png',
+      intro: 'ワシミミズクの肖像画。立派な羽角は本人のお気に入り。褒めると一日超ご機嫌。ずっと笑顔。' },
+    { key: 'eldred',     name: '都市英雄 エルドレッド',            src: BOARDGAME + 'eldred.png',
+      intro: '魔法文化が発達した国・ノフレーラ出身。美術館で住み込み警備バイトをしながら、一人で文化観光中。専属の魔術師は国に置いてきた。' }
   ];
 
   // 既定の割り当て（騎のID → キャラクターのキー）。

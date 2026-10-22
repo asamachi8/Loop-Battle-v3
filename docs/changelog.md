@@ -9,6 +9,10 @@
 
 ### 変更
 
+- **キャラクター紹介「幻想肖像画美術館」の並び順を変更**（ガイドあさまち → ツヅミサロン長 → シンガーアオスケ
+  → ジェーンドゥ → アメリゴ船長 → マルグリットメイド長）。`src/main.js` の `CHAR_COLLECTIONS.gallery.keys`
+### 変更
+
 - **フォルダを1つにまとめた。** `Loop Battle Ver1.0 GitHubアップロード用` を廃止し、
   `Loop Battle Ver1.0 githubver` の中身をそのまま GitHub へ上げる形にした
   - あわせて `assets/**/original/`（元画像9枚・約17MB）をプロジェクトから外した。
@@ -27,7 +31,7 @@
   - ページは index.html と同じ見た目。目次（12項目）と「ゲームに戻る」ボタン付き。JavaScript は使わない
   - 原文は `docs/guidelines.md` にも置いた。お問い合わせフォームは
     https://asamachi8.github.io/asaHP/contact.html へのリンクにした（別タブで開く）
-- キャッシュ避けを `?v=1.0.8` にした
+- キャッシュ避けを `?v=1.0.10` にした
 
 ---
 
